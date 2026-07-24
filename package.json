@@ -1,0 +1,16 @@
+{
+  "name": "proforma-invoice-maker",
+  "version": "1.0.0",
+  "description": "Progressive Web App for generating and managing hotel and event proforma invoices in English and Arabic.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test_server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "sqlite3": "^5.1.7"
+  },
+  "private": true
+}
