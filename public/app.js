@@ -98,6 +98,8 @@ const elements = {
   
   printEnBtn: document.getElementById('print-en-btn'),
   printArBtn: document.getElementById('print-ar-btn'),
+  themeToggleBtn: document.getElementById('theme-toggle-btn'),
+  themeToggleIcon: document.getElementById('theme-toggle-icon'),
   
   // History view elements
   searchQuery: document.getElementById('search-query'),
@@ -1489,6 +1491,22 @@ elements.searchResetBtn.addEventListener('click', () => {
 });
 
 
+function applyTheme(theme) {
+  const root = document.documentElement;
+  const isLight = theme === 'light';
+  root.setAttribute('data-theme', isLight ? 'light' : 'dark');
+  if (elements.themeToggleIcon) {
+    elements.themeToggleIcon.className = isLight ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+  }
+  localStorage.setItem('app-theme', theme);
+}
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('app-theme');
+  const preferredTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  applyTheme(preferredTheme);
+}
+
 // ================= SERVICE WORKER REGISTRATION =================
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -1505,8 +1523,13 @@ elements.loginForm.addEventListener('submit', (e) => {
 });
 
 elements.logoutBtn.addEventListener('click', performLogout);
+elements.themeToggleBtn?.addEventListener('click', () => {
+  const currentTheme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  applyTheme(currentTheme === 'light' ? 'dark' : 'light');
+});
 
 // Start
+initTheme();
 renderTableHeaders();
 addNewRow();
 checkLoginState();

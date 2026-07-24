@@ -4,6 +4,7 @@
   --bg-dark: #121b21;
   --bg-card: #1c2a33;
   --bg-active: #263844;
+  --surface-elevated: #24343f;
   
   --primary: #d97706; /* Luxury Brushed Gold */
   --primary-hover: #b45309;
@@ -30,6 +31,25 @@
   --transition-normal: 0.3s ease;
 }
 
+:root[data-theme="light"] {
+  --bg-darker: #f5f7fb;
+  --bg-dark: #eef2f7;
+  --bg-card: #ffffff;
+  --bg-active: #e8eef6;
+  --surface-elevated: #f8fafc;
+  --primary: #d97706;
+  --primary-hover: #b45309;
+  --secondary: #10b981;
+  --secondary-hover: #059669;
+  --text-main: #17212b;
+  --text-muted: #64748b;
+  --text-danger: #dc2626;
+  --border-color: #d8e0ea;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 8px 20px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 16px 34px rgba(15, 23, 42, 0.12);
+}
+
 /* ================= GLOBAL RESET ================= */
 * {
   box-sizing: border-box;
@@ -45,6 +65,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
 /* Utility Helpers */
@@ -591,6 +612,16 @@ body {
 .btn-icon-only:hover {
   background-color: rgba(239, 68, 110, 0.1);
   color: var(--text-danger);
+}
+.theme-toggle-btn {
+  margin-right: 10px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-card);
+  color: var(--text-main);
+}
+.theme-toggle-btn:hover {
+  background-color: var(--bg-active);
+  color: var(--primary);
 }
 
 /* Summary Math Panel details */
