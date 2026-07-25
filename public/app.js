@@ -122,6 +122,13 @@ const elements = {
   setPhone: document.getElementById('set-phone'),
   setEmail: document.getElementById('set-email'),
   setWebsite: document.getElementById('set-website'),
+  setAccountName: document.getElementById('set-account-name'),
+  setAccountNumber: document.getElementById('set-account-number'),
+  setIbanNumber: document.getElementById('set-iban-number'),
+  setBankName: document.getElementById('set-bank-name'),
+  setBranchName: document.getElementById('set-branch-name'),
+  setSwiftCode: document.getElementById('set-swift-code'),
+  setPaymentTerms: document.getElementById('set-payment-terms'),
   setSerialPrefix: document.getElementById('set-serial-prefix'),
   setNextSerial: document.getElementById('set-next-serial'),
   uploadLogo: document.getElementById('upload-logo'),
@@ -385,6 +392,13 @@ async function loadSettings() {
     elements.setPhone.value = hotelSettings.phone || '';
     elements.setEmail.value = hotelSettings.email || '';
     elements.setWebsite.value = hotelSettings.website || '';
+    elements.setAccountName.value = hotelSettings.account_name || '';
+    elements.setAccountNumber.value = hotelSettings.account_number || '';
+    elements.setIbanNumber.value = hotelSettings.iban_number || '';
+    elements.setBankName.value = hotelSettings.bank_name || '';
+    elements.setBranchName.value = hotelSettings.branch_name || '';
+    elements.setSwiftCode.value = hotelSettings.swift_code || '';
+    elements.setPaymentTerms.value = hotelSettings.payment_terms || '';
     elements.setSerialPrefix.value = hotelSettings.serial_prefix || '';
     elements.setNextSerial.value = hotelSettings.next_serial || '';
     
@@ -464,6 +478,13 @@ elements.settingsForm.addEventListener('submit', async (e) => {
     phone: elements.setPhone.value,
     email: elements.setEmail.value,
     website: elements.setWebsite.value,
+    account_name: elements.setAccountName.value,
+    account_number: elements.setAccountNumber.value,
+    iban_number: elements.setIbanNumber.value,
+    bank_name: elements.setBankName.value,
+    branch_name: elements.setBranchName.value,
+    swift_code: elements.setSwiftCode.value,
+    payment_terms: elements.setPaymentTerms.value,
     serial_prefix: elements.setSerialPrefix.value,
     next_serial: elements.setNextSerial.value,
     hotel_logo: logoBase64,
@@ -644,34 +665,54 @@ function addNewRow() {
   
   if (currentInvoiceType === 'room') {
     inputsHtml = `
-      <td><input type="text" class="row-desc" placeholder="e.g. Deluxe Room" required></td>
-      <td><input type="date" class="row-arrival" required></td>
-      <td><input type="date" class="row-departure" required></td>
-      <td><input type="number" class="row-nights" min="1" placeholder="Nights" required></td>
-      <td><input type="number" class="row-rate" min="0" step="0.01" placeholder="0.00" required></td>
-      <td><input type="number" class="row-total" placeholder="0.00" disabled></td>
+      <td class="invoice-desc-cell"><input type="text" class="row-desc" placeholder="e.g. Deluxe Room" required></td>
+      <td class="invoice-date-cell">
+        <div class="date-input-wrap">
+          <input type="date" class="row-arrival" lang="en-GB" placeholder="dd/mm/yyyy" required>
+          <span class="date-input-hint">DD/MM/YYYY</span>
+        </div>
+      </td>
+      <td class="invoice-date-cell">
+        <div class="date-input-wrap">
+          <input type="date" class="row-departure" lang="en-GB" placeholder="dd/mm/yyyy" required>
+          <span class="date-input-hint">DD/MM/YYYY</span>
+        </div>
+      </td>
+      <td class="invoice-number-cell"><input type="number" class="row-nights" min="1" placeholder="Nights" required></td>
+      <td class="invoice-number-cell"><input type="number" class="row-rate" min="0" step="0.01" placeholder="0.00" required></td>
+      <td class="invoice-number-cell"><input type="number" class="row-total" placeholder="0.00" disabled></td>
     `;
   } else if (currentInvoiceType === 'event') {
     inputsHtml = `
-      <td><input type="text" class="row-desc" placeholder="e.g. Wedding Hall Setup" required></td>
-      <td><input type="date" class="row-start" required></td>
-      <td><input type="date" class="row-end" required></td>
-      <td><input type="number" class="row-pax" min="0" placeholder="Pax" required></td>
-      <td><input type="number" class="row-pax-charge" min="0" step="0.01" placeholder="0.00" required></td>
-      <td><input type="number" class="row-rental" min="0" step="0.01" placeholder="0.00" required></td>
-      <td><input type="number" class="row-total" placeholder="0.00" disabled></td>
+      <td class="invoice-desc-cell"><input type="text" class="row-desc" placeholder="e.g. Wedding Hall Setup" required></td>
+      <td class="invoice-date-cell">
+        <div class="date-input-wrap">
+          <input type="date" class="row-start" lang="en-GB" placeholder="dd/mm/yyyy" required>
+          <span class="date-input-hint">DD/MM/YYYY</span>
+        </div>
+      </td>
+      <td class="invoice-date-cell">
+        <div class="date-input-wrap">
+          <input type="date" class="row-end" lang="en-GB" placeholder="dd/mm/yyyy" required>
+          <span class="date-input-hint">DD/MM/YYYY</span>
+        </div>
+      </td>
+      <td class="invoice-number-cell"><input type="number" class="row-pax" min="0" placeholder="Pax" required></td>
+      <td class="invoice-number-cell"><input type="number" class="row-pax-charge" min="0" step="0.01" placeholder="0.00" required></td>
+      <td class="invoice-number-cell"><input type="number" class="row-rental" min="0" step="0.01" placeholder="0.00" required></td>
+      <td class="invoice-number-cell"><input type="number" class="row-total" placeholder="0.00" disabled></td>
     `;
   } else if (currentInvoiceType === 'misc') {
     inputsHtml = `
-      <td><input type="text" class="row-desc" placeholder="e.g. Florist Cover Fee" required></td>
-      <td><input type="number" class="row-qty" min="1" placeholder="Qty" required></td>
-      <td><input type="number" class="row-unit-price" min="0" step="0.01" placeholder="0.00" required></td>
-      <td><input type="number" class="row-total" placeholder="0.00" disabled></td>
+      <td class="invoice-desc-cell"><input type="text" class="row-desc" placeholder="e.g. Florist Cover Fee" required></td>
+      <td class="invoice-number-cell"><input type="number" class="row-qty" min="1" placeholder="Qty" required></td>
+      <td class="invoice-number-cell"><input type="number" class="row-unit-price" min="0" step="0.01" placeholder="0.00" required></td>
+      <td class="invoice-number-cell"><input type="number" class="row-total" placeholder="0.00" disabled></td>
     `;
   }
   
   inputsHtml += `
-    <td class="cell-actions">
+    <td class="cell-actions invoice-actions-cell">
       <button type="button" class="btn-icon-only remove-row-btn" title="Delete Row">
         <i class="fa-solid fa-trash-can"></i>
       </button>
@@ -969,6 +1010,13 @@ function triggerPrintHTML(invoice, invoiceNum, lang) {
   document.getElementById('print-hotel-email').textContent = hotelSettings.email || '';
   document.getElementById('print-hotel-website').textContent = hotelSettings.website || '';
   document.getElementById('print-hotel-vat').textContent = hotelSettings.vat_number || '';
+  document.getElementById('print-bank-account-name').textContent = hotelSettings.account_name ? `Account Name: ${hotelSettings.account_name}` : '';
+  document.getElementById('print-bank-account-number').textContent = hotelSettings.account_number ? `Account Number: ${hotelSettings.account_number}` : '';
+  document.getElementById('print-bank-iban').textContent = hotelSettings.iban_number ? `IBAN: ${hotelSettings.iban_number}` : '';
+  document.getElementById('print-bank-name').textContent = hotelSettings.bank_name ? hotelSettings.bank_name : '';
+  document.getElementById('print-branch-name').textContent = hotelSettings.branch_name ? hotelSettings.branch_name : '';
+  document.getElementById('print-bank-swift').textContent = hotelSettings.swift_code ? `SWIFT: ${hotelSettings.swift_code}` : '';
+  document.getElementById('print-payment-terms').textContent = hotelSettings.payment_terms || '';
   
   // Logo & Stamp binding
   const logoImg = document.getElementById('print-logo-img');

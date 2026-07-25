@@ -528,6 +528,44 @@
                 </div>
               </div>
 
+              <!-- Bank Details & Payment Terms -->
+              <div class="card">
+                <div class="card-header">
+                  <div class="card-title-icon"><i class="fa-solid fa-building-columns"></i></div>
+                  <h3>Bank Account Details & Payment Terms</h3>
+                </div>
+                <div class="card-body form-row-2">
+                  <div class="input-group">
+                    <label for="set-account-name">Account Name</label>
+                    <input type="text" id="set-account-name" placeholder="Hotel account holder name">
+                  </div>
+                  <div class="input-group">
+                    <label for="set-account-number">Account Number</label>
+                    <input type="text" id="set-account-number" placeholder="Bank account number">
+                  </div>
+                  <div class="input-group">
+                    <label for="set-iban-number">IBAN Number</label>
+                    <input type="text" id="set-iban-number" placeholder="International bank account number">
+                  </div>
+                  <div class="input-group">
+                    <label for="set-bank-name">Bank Name</label>
+                    <input type="text" id="set-bank-name" placeholder="Bank name">
+                  </div>
+                  <div class="input-group">
+                    <label for="set-branch-name">Branch Name</label>
+                    <input type="text" id="set-branch-name" placeholder="Branch name">
+                  </div>
+                  <div class="input-group">
+                    <label for="set-swift-code">SWIFT Code</label>
+                    <input type="text" id="set-swift-code" placeholder="SWIFT/BIC code">
+                  </div>
+                  <div class="input-group block-span-2">
+                    <label for="set-payment-terms">Default Payment Terms</label>
+                    <textarea id="set-payment-terms" rows="4" placeholder="Enter default payment terms to appear on every invoice"></textarea>
+                  </div>
+                </div>
+              </div>
+
               <!-- Serial Controls -->
               <div class="card">
                 <div class="card-header">
@@ -789,6 +827,25 @@
           </tr>
         </tbody>
       </table>
+    </section>
+
+    <section class="print-payment-section">
+      <div class="print-payment-grid">
+        <div>
+          <strong>Bank Details / تفاصيل الحساب البنكي</strong>
+          <p class="print-payment-text">
+            <span id="print-bank-account-name"></span><br>
+            <span id="print-bank-account-number"></span><br>
+            <span id="print-bank-iban"></span><br>
+            <span id="print-bank-name"></span> / <span id="print-branch-name"></span><br>
+            <span id="print-bank-swift"></span>
+          </p>
+        </div>
+        <div>
+          <strong>Default Payment Terms / شروط الدفع</strong>
+          <p id="print-payment-terms" class="print-payment-text"></p>
+        </div>
+      </div>
     </section>
 
     <!-- Signature lines & Terms -->

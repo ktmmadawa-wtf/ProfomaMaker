@@ -555,11 +555,38 @@ body {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  table-layout: fixed;
 }
 .data-table th, .data-table td {
   padding: 14px 20px;
   border-bottom: 1px solid var(--border-color);
   font-size: 0.9rem;
+}
+.data-table th:nth-child(1), .data-table td:nth-child(1),
+.data-table th:nth-child(2), .data-table td:nth-child(2),
+.data-table th:nth-child(3), .data-table td:nth-child(3),
+.data-table th:nth-child(4), .data-table td:nth-child(4),
+.data-table th:nth-child(5), .data-table td:nth-child(5),
+.data-table th:nth-child(6), .data-table td:nth-child(6),
+.data-table th:nth-child(7), .data-table td:nth-child(7),
+.data-table th:nth-child(8), .data-table td:nth-child(8) {
+  min-width: 0;
+}
+.invoice-desc-cell {
+  min-width: 220px;
+  width: 32%;
+}
+.invoice-date-cell {
+  min-width: 140px;
+  width: 14%;
+}
+.invoice-number-cell {
+  min-width: 110px;
+  width: 12%;
+}
+.invoice-actions-cell {
+  width: 70px;
+  min-width: 70px;
 }
 .data-table th {
   background-color: rgba(12, 19, 23, 0.4);
@@ -580,11 +607,26 @@ body {
   background-color: var(--bg-darker);
   border: 1px solid var(--border-color);
   color: var(--text-main);
-  padding: 8px 12px;
+  padding: 9px 12px;
   border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 0.88rem;
   width: 100%;
+  min-height: 38px;
+  box-sizing: border-box;
+}
+.data-table input[type="date"] {
+  color-scheme: dark;
+}
+.date-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.date-input-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
 }
 .data-table input:focus {
   border-color: var(--primary);
@@ -1187,6 +1229,20 @@ body {
   }
   .rtl-body .print-summary-table td:last-child {
     text-align: left !important;
+  }
+  .print-payment-section {
+    margin-top: 18px !important;
+    border-top: 1px solid #ddd !important;
+    padding-top: 12px !important;
+  }
+  .print-payment-grid {
+    display: grid !important;
+    gap: 10px !important;
+  }
+  .print-payment-text {
+    margin: 4px 0 0 !important;
+    line-height: 1.45 !important;
+    font-size: 8.5pt !important;
   }
   .print-grand-total td {
     font-size: 9.5pt !important;
