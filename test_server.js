@@ -1,29 +1,27 @@
 const assert = require('assert');
 const sqlite3 = require('sqlite3').verbose();
-const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 
-console.log('--- RUNNING BACKEND INTEGRATION & MATHEMATICAL TESTS ---');
+(async () => {
+  console.log('--- RUNNING BACKEND INTEGRATION & MATHEMATICAL TESTS ---');
 
-// Cryptography tests
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-  return `${salt}:${hash}`;
+// Cryptography tests using bcrypt
+async function hashPassword(password) {
+  return await bcrypt.hash(password, 12);
 }
 
-function verifyPassword(password, stored) {
-  const [salt, hash] = stored.split(':');
-  const check = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-  return hash === check;
+async function verifyPassword(password, storedHash) {
+  if (!storedHash) return false;
+  return await bcrypt.compare(password, storedHash);
 }
 
 // 1. Validate Auth Encryption
 console.log('Testing authentication password hashing...');
 const pw = 'SecretSecurePassword123';
-const hash = hashPassword(pw);
-assert.ok(hash.includes(':'), 'Hash should contain separator colon');
-assert.ok(verifyPassword(pw, hash), 'Verification should succeed for correct password');
-assert.ok(!verifyPassword('WrongPassword', hash), 'Verification should fail for incorrect password');
+const hash = await hashPassword(pw);
+assert.ok(hash.includes('$2b$'), 'Hash should be bcrypt format');
+assert.ok(await verifyPassword(pw, hash), 'Verification should succeed for correct password');
+assert.ok(!(await verifyPassword('WrongPassword', hash)), 'Verification should fail for incorrect password');
 console.log('✅ Auth encryption tests passed.');
 
 // 2. Setup in-memory database for math & concurrency validation
@@ -191,7 +189,12 @@ db.serialize(() => {
         
         console.log('\n🎉 ALL TESTS COMPLETED SUCCESSFULLY WITH ZERO ERRORS. 🎉');
         db.close();
+        process.exit(0);
       });
     });
   });
+  });
+})().catch(err => {
+  console.error('❌ Test failed:', err);
+  process.exit(1);
 });

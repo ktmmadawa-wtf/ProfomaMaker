@@ -2,19 +2,53 @@ const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const crypto = require('crypto');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_PATH = path.join(__dirname, 'database.db');
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const SALT_ROUNDS = 12;
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Support base64 image uploads
+// Security Middleware
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://profomamaker.onrender.com'] 
+    : ['http://localhost:3000', 'http://localhost:10000'],
+  credentials: true
+}));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Rate limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many login attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // Serve frontend static assets from public folder
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d',
+  etag: false
+}));
 
 // Database setup
 const db = new sqlite3.Database(DB_PATH, (err) => {
@@ -26,35 +60,28 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
   }
 });
 
-// Crypto Helpers
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-  return `${salt}:${hash}`;
+// Password Helpers
+async function hashPassword(password) {
+  return await bcrypt.hash(password, SALT_ROUNDS);
 }
 
-function verifyPassword(password, stored) {
-  if (!stored || !stored.includes(':')) return false;
-  const [salt, hash] = stored.split(':');
-  const check = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-  return hash === check;
+async function verifyPassword(password, storedHash) {
+  if (!storedHash) return false;
+  return await bcrypt.compare(password, storedHash);
 }
 
-// Generate simple mock JWT token (base64 encoded JSON)
+// JWT Token Management
 function generateToken(user) {
-  const payload = {
-    username: user.username,
-    role: user.role,
-    exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-  };
-  return Buffer.from(JSON.stringify(payload)).toString('base64');
+  return jwt.sign(
+    { username: user.username, role: user.role },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
 }
 
 function decodeToken(token) {
   try {
-    const payload = JSON.parse(Buffer.from(token, 'base64').toString('utf8'));
-    if (payload.exp < Date.now()) return null;
-    return payload;
+    return jwt.verify(token, JWT_SECRET);
   } catch (e) {
     return null;
   }
@@ -103,7 +130,7 @@ function initializeDatabase() {
     db.run(`CREATE TABLE IF NOT EXISTS invoices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       invoice_number TEXT UNIQUE NOT NULL,
-      invoice_type TEXT NOT NULL, -- 'room', 'event', 'misc'
+      invoice_type TEXT NOT NULL,
       company_name TEXT NOT NULL,
       contact_person TEXT,
       address_1 TEXT,
@@ -122,7 +149,7 @@ function initializeDatabase() {
       advance_payment REAL DEFAULT 0,
       grand_total REAL NOT NULL,
       balance_due REAL NOT NULL,
-      items TEXT NOT NULL, -- JSON string representing invoice items
+      items TEXT NOT NULL,
       created_by TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
@@ -157,16 +184,36 @@ function initializeDatabase() {
     )`);
 
     // Seed default admin user if table is empty
-    db.get('SELECT COUNT(*) as count FROM users', (err, row) => {
-      if (err) console.error('Error counting users:', err);
-      else if (row.count === 0) {
-        const defaultAdminHash = hashPassword('admin123');
-        db.run('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', ['admin', defaultAdminHash, 'admin'], (err) => {
-          if (err) console.error('Failed to seed default admin:', err);
-          else console.log('Default admin user created successfully (username: admin, password: admin123).');
+    const seedDefaultAdmin = async () => {
+      try {
+        const count = await new Promise((resolve, reject) => {
+          db.get('SELECT COUNT(*) as count FROM users', (err, row) => {
+            if (err) reject(err);
+            else resolve(row ? row.count : 0);
+          });
         });
+
+        if (count === 0) {
+          const defaultAdminHash = await hashPassword('admin123');
+          await new Promise((resolve, reject) => {
+            db.run(
+              'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
+              ['admin', defaultAdminHash, 'admin'],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+          console.log('Default admin user created successfully (username: admin, password: admin123).');
+          console.log('WARNING: Please change this password immediately after first login!');
+        }
+      } catch (err) {
+        console.error('Error seeding default admin:', err);
       }
-    });
+    };
+
+    seedDefaultAdmin();
 
     // Seed default settings
     const defaultSettings = [
@@ -203,15 +250,21 @@ function initializeDatabase() {
 // API Endpoints
 
 // Authentication
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(404).json({ error: 'Username and password are required' });
-  }
+app.post('/api/login', authLimiter, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
 
-  db.get('SELECT * FROM users WHERE username = ?', [username], (err, user) => {
-    if (err) return res.status(500).json({ error: 'Database error' });
-    if (!user || !verifyPassword(password, user.password_hash)) {
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE username = ?', [username], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!user || !(await verifyPassword(password, user.password_hash))) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
@@ -224,13 +277,19 @@ app.post('/api/login', (req, res) => {
         role: user.role
       }
     });
-  });
+  } catch (error) {
+    console.error('Login error:', error.message);
+    res.status(500).json({ error: 'An error occurred during login' });
+  }
 });
 
 // Settings Management
 app.get('/api/settings', authenticate, (req, res) => {
   db.all('SELECT key, value FROM settings', (err, rows) => {
-    if (err) return res.status(500).json({ error: 'Database error' });
+    if (err) {
+      console.error('Error fetching settings:', err.message);
+      return res.status(500).json({ error: 'Failed to load settings' });
+    }
     const settingsObj = {};
     rows.forEach(row => {
       settingsObj[row.key] = row.value;
@@ -239,79 +298,104 @@ app.get('/api/settings', authenticate, (req, res) => {
   });
 });
 
-app.post('/api/settings', authenticate, (req, res) => {
+app.post('/api/settings', authenticate, apiLimiter, (req, res) => {
   const settings = req.body;
   const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
   
   db.serialize(() => {
     db.run('BEGIN TRANSACTION');
     for (const key in settings) {
-      if (settings.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(settings, key)) {
         stmt.run(key, String(settings[key]));
       }
     }
     db.run('COMMIT', (err) => {
+      stmt.finalize();
       if (err) {
         db.run('ROLLBACK');
+        console.error('Error saving settings:', err.message);
         return res.status(500).json({ error: 'Failed to save settings' });
       }
       res.json({ success: true, message: 'Settings updated successfully' });
     });
   });
-  stmt.finalize();
 });
 
 // User Management (Admin only)
 app.get('/api/users', authenticate, requireAdmin, (req, res) => {
   db.all('SELECT id, username, role FROM users', (err, rows) => {
-    if (err) return res.status(500).json({ error: 'Database error' });
+    if (err) {
+      console.error('Error fetching users:', err.message);
+      return res.status(500).json({ error: 'Failed to load users' });
+    }
     res.json(rows);
   });
 });
 
-app.post('/api/users', authenticate, requireAdmin, (req, res) => {
-  const { username, password, role } = req.body;
-  if (!username || !role) {
-    return res.status(400).json({ error: 'Username and role are required' });
-  }
+app.post('/api/users', authenticate, requireAdmin, apiLimiter, async (req, res) => {
+  try {
+    const { username, password, role } = req.body;
+    if (!username || !role) {
+      return res.status(400).json({ error: 'Username and role are required' });
+    }
 
-  // Check if updating or creating
-  db.get('SELECT * FROM users WHERE username = ?', [username], (err, existingUser) => {
-    if (err) return res.status(500).json({ error: 'Database error' });
+    const existingUser = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE username = ?', [username], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
 
     if (existingUser) {
-      // Update
       if (password) {
-        // Update password and role
-        const hash = hashPassword(password);
-        db.run('UPDATE users SET password_hash = ?, role = ? WHERE username = ?', [hash, role, username], function(err) {
-          if (err) return res.status(500).json({ error: 'Database error' });
-          res.json({ success: true, message: `User ${username} updated successfully` });
+        const hash = await hashPassword(password);
+        await new Promise((resolve, reject) => {
+          db.run(
+            'UPDATE users SET password_hash = ?, role = ? WHERE username = ?',
+            [hash, role, username],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
         });
+        res.json({ success: true, message: `User ${username} updated successfully` });
       } else {
-        // Update role only
-        db.run('UPDATE users SET role = ? WHERE username = ?', [role, username], function(err) {
-          if (err) return res.status(500).json({ error: 'Database error' });
-          res.json({ success: true, message: `User ${username} role updated to ${role}` });
+        await new Promise((resolve, reject) => {
+          db.run('UPDATE users SET role = ? WHERE username = ?', [role, username], (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
         });
+        res.json({ success: true, message: `User ${username} role updated to ${role}` });
       }
     } else {
-      // Create new
       if (!password) {
         return res.status(400).json({ error: 'Password is required for new users' });
       }
-      const hash = hashPassword(password);
-      db.run('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', [username, hash, role], function(err) {
-        if (err) {
-          if (err.message.includes('UNIQUE')) {
-            return res.status(400).json({ error: 'Username already exists' });
+      const hash = await hashPassword(password);
+      await new Promise((resolve, reject) => {
+        db.run(
+          'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
+          [username, hash, role],
+          (err) => {
+            if (err) {
+              if (err.message.includes('UNIQUE')) {
+                return res.status(400).json({ error: 'Username already exists' });
+              }
+              reject(err);
+            } else {
+              resolve();
+            }
           }
-          return res.status(500).json({ error: 'Database error' });
-        }
-        res.json({ success: true, message: `User ${username} created successfully` });
+        );
       });
+      res.json({ success: true, message: `User ${username} created successfully` });
     }
-  });
+  } catch (error) {
+    console.error('Error saving user:', error.message);
+    res.status(500).json({ error: 'Failed to save user' });
+  }
 });
 
 app.delete('/api/users/:username', authenticate, requireAdmin, (req, res) => {
@@ -324,13 +408,16 @@ app.delete('/api/users/:username', authenticate, requireAdmin, (req, res) => {
   }
 
   db.run('DELETE FROM users WHERE username = ?', [targetUsername], function(err) {
-    if (err) return res.status(500).json({ error: 'Database error' });
+    if (err) {
+      console.error('Error deleting user:', err.message);
+      return res.status(500).json({ error: 'Failed to delete user' });
+    }
     res.json({ success: true, message: `User ${targetUsername} deleted` });
   });
 });
 
 // Invoices Management
-app.post('/api/invoices', authenticate, (req, res) => {
+app.post('/api/invoices', authenticate, apiLimiter, (req, res) => {
   const {
     invoice_type,
     company_name,
@@ -357,12 +444,9 @@ app.post('/api/invoices', authenticate, (req, res) => {
     return res.status(400).json({ error: 'Missing required invoice parameters' });
   }
 
-  // Double check calculations server-side for integrity (optional, but highly professional)
-  // Let's enforce sequential serial incrementing in a transaction
   db.serialize(() => {
     db.run('BEGIN TRANSACTION');
 
-    // Get suffix and prefix
     db.get("SELECT value FROM settings WHERE key = 'serial_prefix'", (err, rowPrefix) => {
       if (err) {
         db.run('ROLLBACK');
@@ -379,7 +463,6 @@ app.post('/api/invoices', authenticate, (req, res) => {
         const serialNum = parseInt(rowSerial ? rowSerial.value : '1001');
         const invoice_number = `${prefix}${serialNum}`;
 
-        // Insert invoice
         db.run(
           `INSERT INTO invoices (
             invoice_number, invoice_type, company_name, contact_person, address_1, address_2, address_3, city, country, customer_vat, invoice_date, currency, 
@@ -413,10 +496,9 @@ app.post('/api/invoices', authenticate, (req, res) => {
             if (err) {
               db.run('ROLLBACK');
               console.error('Error inserting invoice:', err.message);
-              return res.status(500).json({ error: 'Failed to record invoice: ' + err.message });
+              return res.status(500).json({ error: 'Failed to record invoice' });
             }
 
-            // Increment serial
             const nextSerialVal = String(serialNum + 1);
             db.run("UPDATE settings SET value = ? WHERE key = 'next_serial'", [nextSerialVal], (err) => {
               if (err) {
@@ -430,7 +512,6 @@ app.post('/api/invoices', authenticate, (req, res) => {
                   return res.status(500).json({ error: 'Transaction commit failed' });
                 }
                 
-                // Return success details
                 res.status(201).json({
                   success: true,
                   invoice_number,
@@ -468,7 +549,6 @@ app.get('/api/invoices', authenticate, (req, res) => {
   }
 
   if (amount) {
-    // Search close to the grand total or balance due
     query += ' AND (grand_total = ? OR balance_due = ?)';
     params.push(parseFloat(amount), parseFloat(amount));
   }
@@ -478,9 +558,8 @@ app.get('/api/invoices', authenticate, (req, res) => {
   db.all(query, params, (err, rows) => {
     if (err) {
       console.error('Error searching invoices:', err.message);
-      return res.status(500).json({ error: 'Database error' });
+      return res.status(500).json({ error: 'Failed to retrieve invoices' });
     }
-    // Parse items JSON for frontend ease
     const formatted = rows.map(row => ({
       ...row,
       items: JSON.parse(row.items)
@@ -503,81 +582,92 @@ app.get('/api/customers', authenticate, (req, res) => {
   db.all(query, params, (err, rows) => {
     if (err) {
       console.error('Error searching customers:', err.message);
-      return res.status(500).json({ error: 'Database error' });
+      return res.status(500).json({ error: 'Failed to load customers' });
     }
     res.json(rows);
   });
 });
 
-app.post('/api/customers', authenticate, (req, res) => {
-  const { id, company_name, contact_person, address_1, address_2, address_3, city, country, vat_number } = req.body;
-  if (!company_name) {
-    return res.status(400).json({ error: 'Company Name is required' });
-  }
+app.post('/api/customers', authenticate, apiLimiter, async (req, res) => {
+  try {
+    const { id, company_name, contact_person, address_1, address_2, address_3, city, country, vat_number } = req.body;
+    if (!company_name) {
+      return res.status(400).json({ error: 'Company Name is required' });
+    }
 
-  if (id) {
-    // Update existing
-    db.run(
-      `UPDATE customers SET company_name = ?, contact_person = ?, address_1 = ?, address_2 = ?, address_3 = ?, city = ?, country = ?, vat_number = ? WHERE id = ?`,
-      [company_name, contact_person || '', address_1 || '', address_2 || '', address_3 || '', city || '', country || '', vat_number || '', id],
-      function(err) {
-        if (err) return res.status(500).json({ error: 'Database error: ' + err.message });
-        res.json({ success: true, message: 'Customer updated successfully' });
-      }
-    );
-  } else {
-    // Create new. Get next customer serial in a transaction
-    db.serialize(() => {
-      db.run('BEGIN TRANSACTION');
-      db.get("SELECT value FROM settings WHERE key = 'next_customer_serial'", (err, rowSerial) => {
-        if (err) {
-          db.run('ROLLBACK');
-          return res.status(500).json({ error: 'Database error reading customer serial' });
-        }
-        
-        const serialNum = parseInt(rowSerial ? rowSerial.value : '1001');
-        const customer_number = `CUST-${serialNum}`;
-        
+    if (id) {
+      await new Promise((resolve, reject) => {
         db.run(
-          `INSERT INTO customers (customer_number, company_name, contact_person, address_1, address_2, address_3, city, country, vat_number)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [customer_number, company_name, contact_person || '', address_1 || '', address_2 || '', address_3 || '', city || '', country || '', vat_number || ''],
-          function(err) {
-            if (err) {
-              db.run('ROLLBACK');
-              return res.status(500).json({ error: 'Database error: ' + err.message });
-            }
-            
-            const nextSerial = String(serialNum + 1);
-            db.run("UPDATE settings SET value = ? WHERE key = 'next_customer_serial'", [nextSerial], (err) => {
-              if (err) {
-                db.run('ROLLBACK');
-                return res.status(500).json({ error: 'Failed to increment customer serial' });
-              }
-              
-              db.run('COMMIT', (err) => {
-                if (err) {
-                  db.run('ROLLBACK');
-                  return res.status(500).json({ error: 'Transaction commit failed' });
-                }
-                res.status(201).json({
-                  success: true,
-                  customer_number,
-                  customer_id: this.lastID
-                });
-              });
-            });
+          `UPDATE customers SET company_name = ?, contact_person = ?, address_1 = ?, address_2 = ?, address_3 = ?, city = ?, country = ?, vat_number = ? WHERE id = ?`,
+          [company_name, contact_person || '', address_1 || '', address_2 || '', address_3 || '', city || '', country || '', vat_number || '', id],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
           }
         );
       });
-    });
+      res.json({ success: true, message: 'Customer updated successfully' });
+    } else {
+      await new Promise((resolve, reject) => {
+        db.serialize(() => {
+          db.run('BEGIN TRANSACTION');
+          db.get("SELECT value FROM settings WHERE key = 'next_customer_serial'", (err, rowSerial) => {
+            if (err) {
+              db.run('ROLLBACK');
+              return reject(err);
+            }
+            
+            const serialNum = parseInt(rowSerial ? rowSerial.value : '1001');
+            const customer_number = `CUST-${serialNum}`;
+            
+            db.run(
+              `INSERT INTO customers (customer_number, company_name, contact_person, address_1, address_2, address_3, city, country, vat_number)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [customer_number, company_name, contact_person || '', address_1 || '', address_2 || '', address_3 || '', city || '', country || '', vat_number || ''],
+              (err) => {
+                if (err) {
+                  db.run('ROLLBACK');
+                  return reject(err);
+                }
+                
+                const nextSerial = String(serialNum + 1);
+                db.run("UPDATE settings SET value = ? WHERE key = 'next_customer_serial'", [nextSerial], (err) => {
+                  if (err) {
+                    db.run('ROLLBACK');
+                    return reject(err);
+                  }
+                  
+                  db.run('COMMIT', (err) => {
+                    if (err) {
+                      db.run('ROLLBACK');
+                      return reject(err);
+                    }
+                    res.status(201).json({
+                      success: true,
+                      customer_number,
+                      customer_id: this.lastID
+                    });
+                  });
+                });
+              }
+            );
+          });
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Error saving customer:', error.message);
+    res.status(500).json({ error: 'Failed to save customer' });
   }
 });
 
 app.delete('/api/customers/:id', authenticate, (req, res) => {
   const customerId = req.params.id;
   db.run('DELETE FROM customers WHERE id = ?', [customerId], function(err) {
-    if (err) return res.status(500).json({ error: 'Database error' });
+    if (err) {
+      console.error('Error deleting customer:', err.message);
+      return res.status(500).json({ error: 'Failed to delete customer' });
+    }
     res.json({ success: true, message: 'Customer deleted successfully' });
   });
 });
@@ -587,7 +677,33 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running locally at http://localhost:${PORT}`);
+// Global error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(err.status || 500).json({ 
+    error: process.env.NODE_ENV === 'production' 
+      ? 'An unexpected error occurred' 
+      : err.message 
+  });
 });
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+// Start the server
+const startServer = () => {
+  app.listen(PORT, () => {
+    console.log(`Server is running locally at http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('WARNING: Running in development mode. Set NODE_ENV=production for deployment.');
+      console.log('Default admin credentials: admin / admin123');
+      console.log('IMPORTANT: Change the default password immediately after first login!');
+    }
+  });
+};
+
+startServer();
