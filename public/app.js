@@ -1,14 +1,6 @@
 // ================= CONSTANTS & APP STATE =================
 const API_URL = ''; // Relative since served by same server
-const FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyAKM3bO9YZIBo2psjrN6spEfuD-VNpDMuI',
-  authDomain: 'proforma-maker.firebaseapp.com',
-  projectId: 'proforma-maker',
-  storageBucket: 'proforma-maker.firebasestorage.app',
-  messagingSenderId: '1095835945152',
-  appId: '1:1095835945152:web:7c9573d72660a236fa0525',
-  measurementId: 'G-3ZERX7VVH9'
-};
+const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
 
 let token = localStorage.getItem('token') || '';
 let currentUser = null;
