@@ -262,7 +262,7 @@ async function performLogin(username, password) {
     localStorage.setItem('user', JSON.stringify(currentUser));
     
     showApp();
-    loadSettings();
+    await loadSettings();
     loadInvoices();
     loadCustomers();
     if (currentUser.role === 'admin') {
@@ -277,12 +277,12 @@ async function performLogin(username, password) {
   }
 }
 
-function checkLoginState() {
+async function checkLoginState() {
   const cachedUser = localStorage.getItem('user');
   if (token && cachedUser) {
     currentUser = JSON.parse(cachedUser);
     showApp();
-    loadSettings();
+    await loadSettings();
     loadInvoices();
     loadCustomers();
     if (currentUser.role === 'admin') {
