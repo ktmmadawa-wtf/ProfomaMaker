@@ -4,6 +4,7 @@ const FIREBASE_CONFIG = window.FIREBASE_CONFIG || null;
 
 let token = localStorage.getItem('token') || '';
 let currentUser = null;
+let tempTwoFactorToken = localStorage.getItem('tempTwoFactorToken') || '';
 let currentInvoiceType = 'room'; // 'room', 'event', 'misc'
 let hotelSettings = {};
 let firebaseDb = null;
@@ -51,6 +52,10 @@ const elements = {
   loginForm: document.getElementById('login-form'),
   loginUsername: document.getElementById('login-username'),
   loginPassword: document.getElementById('login-password'),
+  loginOtp: document.getElementById('login-otp'),
+  otpGroup: document.getElementById('otp-group'),
+  resendOtpBtn: document.getElementById('resend-otp-btn'),
+  loginSubmitBtn: document.getElementById('login-submit-btn'),
   loginError: document.getElementById('login-error'),
   
   appWrapper: document.getElementById('app-wrapper'),
@@ -141,6 +146,8 @@ const elements = {
   userPasswordLabel: document.getElementById('user-password-label'),
   userPassHelp: document.getElementById('user-pass-help'),
   userRole: document.getElementById('user-role'),
+  userEmail: document.getElementById('user-email'),
+  userTwoFactor: document.getElementById('user-two-factor'),
   saveUserBtn: document.getElementById('save-user-btn'),
   cancelUserEditBtn: document.getElementById('cancel-user-edit-btn'),
   usersListRows: document.getElementById('users-list-rows'),
@@ -255,11 +262,23 @@ async function performLogin(username, password) {
     if (!response.ok) {
       throw new Error(data.error || 'Login failed');
     }
+
+    if (data.requiresTwoFactor) {
+      tempTwoFactorToken = data.tempToken;
+      localStorage.setItem('tempTwoFactorToken', tempTwoFactorToken);
+      elements.otpGroup.classList.remove('hidden');
+      elements.loginOtp.focus();
+      elements.loginError.textContent = data.message || 'Enter the verification code sent to your email.';
+      elements.loginSubmitBtn.innerHTML = '<span>Verify</span> <i class="fa-solid fa-shield-halved"></i>';
+      return;
+    }
     
     token = data.token;
     currentUser = data.user;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(currentUser));
+    tempTwoFactorToken = '';
+    localStorage.removeItem('tempTwoFactorToken');
     
     showApp();
     await loadSettings();
@@ -277,6 +296,66 @@ async function performLogin(username, password) {
   }
 }
 
+async function requestOtp() {
+  if (!tempTwoFactorToken) return;
+  elements.loginError.textContent = '';
+  try {
+    const res = await fetch(`${API_URL}/api/auth/request-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tempToken: tempTwoFactorToken })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to resend code');
+    elements.loginError.textContent = data.message || 'Verification code resent.';
+    elements.loginOtp.value = '';
+    elements.loginOtp.focus();
+  } catch (error) {
+    elements.loginError.textContent = error.message || 'Unable to resend code.';
+  }
+}
+
+async function verifyOtp(otp) {
+  elements.loginError.textContent = '';
+  try {
+    const res = await fetch(`${API_URL}/api/auth/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tempToken: tempTwoFactorToken, otp })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Verification failed');
+    
+    token = data.token;
+    currentUser = data.user;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    tempTwoFactorToken = '';
+    localStorage.removeItem('tempTwoFactorToken');
+    
+    resetLoginForm();
+    showApp();
+    await loadSettings();
+    loadInvoices();
+    loadCustomers();
+    if (currentUser.role === 'admin') {
+      elements.navUsers.classList.remove('hidden');
+      loadUsers();
+    } else {
+      elements.navUsers.classList.add('hidden');
+    }
+  } catch (error) {
+    elements.loginError.textContent = error.message || 'Unable to verify code.';
+  }
+}
+
+function resetLoginForm() {
+  elements.loginForm.reset();
+  elements.otpGroup.classList.add('hidden');
+  elements.loginSubmitBtn.innerHTML = '<span>Log In</span> <i class="fa-solid fa-arrow-right"></i>';
+  elements.loginError.textContent = '';
+}
+
 async function checkLoginState() {
   const cachedUser = localStorage.getItem('user');
   if (token && cachedUser) {
@@ -292,6 +371,15 @@ async function checkLoginState() {
       elements.navUsers.classList.add('hidden');
     }
   } else {
+    token = '';
+    currentUser = null;
+    tempTwoFactorToken = localStorage.getItem('tempTwoFactorToken') || '';
+    if (tempTwoFactorToken) {
+      elements.otpGroup.classList.remove('hidden');
+      elements.loginSubmitBtn.innerHTML = '<span>Verify</span> <i class="fa-solid fa-shield-halved"></i>';
+    } else {
+      resetLoginForm();
+    }
     showLogin();
   }
 }
@@ -313,8 +401,11 @@ function showApp() {
 function performLogout() {
   token = '';
   currentUser = null;
+  tempTwoFactorToken = '';
   localStorage.removeItem('token');
   localStorage.removeItem('user');
+  localStorage.removeItem('tempTwoFactorToken');
+  resetLoginForm();
   showLogin();
 }
 
@@ -519,9 +610,11 @@ async function loadUsers() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><strong>${u.username}</strong></td>
+        <td>${u.email || ''}</td>
         <td><span class="badge ${u.role === 'admin' ? 'btn-primary' : 'btn-secondary'}" style="font-size: 0.75rem; padding: 2px 6px;">${u.role}</span></td>
+        <td>${u.two_factor_enabled ? '<span class="badge btn-success" style="font-size:0.75rem; padding:2px 6px;">Enabled</span>' : '<span class="badge btn-secondary" style="font-size:0.75rem; padding:2px 6px;">Disabled</span>'}</td>
         <td class="cell-actions">
-          <button class="btn btn-secondary btn-sm edit-user-btn" data-username="${u.username}" data-role="${u.role}">
+          <button class="btn btn-secondary btn-sm edit-user-btn" data-username="${u.username}" data-role="${u.role}" data-email="${u.email || ''}" data-two-factor="${u.two_factor_enabled ? '1' : '0'}">
             <i class="fa-solid fa-edit"></i> Edit
           </button>
           <button class="btn btn-outline-danger btn-sm delete-user-btn" data-username="${u.username}">
@@ -537,12 +630,16 @@ async function loadUsers() {
       btn.addEventListener('click', () => {
         const username = btn.getAttribute('data-username');
         const role = btn.getAttribute('data-role');
+        const email = btn.getAttribute('data-email') || '';
+        const twoFactor = btn.getAttribute('data-two-factor') === '1';
         
         editingUserUsername = username;
         elements.userFormTitle.textContent = `Edit User: ${username}`;
         elements.userUsername.value = username;
         elements.userUsername.setAttribute('disabled', 'true');
         elements.userRole.value = role;
+        elements.userEmail.value = email;
+        elements.userTwoFactor.checked = twoFactor;
         
         elements.userPassword.removeAttribute('required');
         elements.userPasswordLabel.innerHTML = 'New Password <span class="text-muted">(Optional)</span>';
@@ -585,6 +682,8 @@ function resetUserForm() {
   elements.userPassword.setAttribute('required', 'true');
   elements.userPasswordLabel.textContent = 'Password';
   elements.userPassHelp.textContent = 'Required for new accounts';
+  elements.userEmail.value = '';
+  elements.userTwoFactor.checked = false;
   elements.saveUserBtn.textContent = 'Create Account';
   elements.cancelUserEditBtn.classList.add('hidden');
   elements.userError.textContent = '';
@@ -596,7 +695,9 @@ elements.userForm.addEventListener('submit', async (e) => {
   const payload = {
     username: elements.userUsername.value,
     password: elements.userPassword.value,
-    role: elements.userRole.value
+    role: elements.userRole.value,
+    email: elements.userEmail.value,
+    two_factor_enabled: elements.userTwoFactor.checked ? 1 : 0
   };
   
   try {
@@ -1559,8 +1660,14 @@ if ('serviceWorker' in navigator) {
 // ================= APP INITIALIZATION =================
 elements.loginForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  performLogin(elements.loginUsername.value.trim(), elements.loginPassword.value);
+  if (tempTwoFactorToken) {
+    verifyOtp(elements.loginOtp.value.trim());
+  } else {
+    performLogin(elements.loginUsername.value.trim(), elements.loginPassword.value);
+  }
 });
+
+elements.resendOtpBtn.addEventListener('click', requestOtp);
 
 elements.logoutBtn.addEventListener('click', performLogout);
 elements.themeToggleBtn?.addEventListener('click', () => {

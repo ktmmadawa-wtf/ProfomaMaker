@@ -45,7 +45,12 @@
           <label for="login-password"><i class="fa-solid fa-lock"></i> Password</label>
           <input type="password" id="login-password" placeholder="Enter password" required autocomplete="current-password">
         </div>
-        <button type="submit" class="btn btn-primary btn-block">
+        <div class="input-group hidden" id="otp-group">
+          <label for="login-otp"><i class="fa-solid fa-shield-halved"></i> Verification Code</label>
+          <input type="text" id="login-otp" placeholder="Enter 4-digit code" maxlength="4" inputmode="numeric" autocomplete="one-time-code">
+          <button type="button" id="resend-otp-btn" class="btn btn-secondary btn-sm">Resend Code</button>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="login-submit-btn">
           <span>Log In</span> <i class="fa-solid fa-arrow-right"></i>
         </button>
       </form>
@@ -670,6 +675,16 @@
                       <option value="admin">Administrator (Full Access)</option>
                     </select>
                   </div>
+                  <div class="input-group">
+                    <label for="user-email">Email Address</label>
+                    <input type="email" id="user-email" placeholder="user@example.com">
+                  </div>
+                  <div class="input-group">
+                    <label>
+                      <input type="checkbox" id="user-two-factor">
+                      Enable Two-Factor Authentication (4-digit email OTP)
+                    </label>
+                  </div>
                   <div class="user-form-buttons">
                     <button type="submit" class="btn btn-primary" id="save-user-btn">Create Account</button>
                     <button type="button" class="btn btn-outline hidden" id="cancel-user-edit-btn">Cancel</button>
@@ -690,13 +705,15 @@
                   <thead>
                     <tr>
                       <th>Username</th>
+                      <th>Email</th>
                       <th>Rights / Role</th>
+                      <th>2FA</th>
                       <th class="actions-col">Actions</th>
                     </tr>
                   </thead>
                   <tbody id="users-list-rows">
                     <tr>
-                      <td colspan="3" class="text-center">Loading accounts...</td>
+                      <td colspan="5" class="text-center">Loading accounts...</td>
                     </tr>
                   </tbody>
                 </table>

@@ -6,12 +6,19 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_PATH = path.join(__dirname, 'database.db');
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SALT_ROUNDS = 12;
+
+const SMTP_HOST = process.env.SMTP_HOST || '';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const SMTP_FROM = process.env.SMTP_FROM || '';
 
 // Security Middleware
 app.use(helmet({
@@ -110,6 +117,64 @@ function requireAdmin(req, res, next) {
   }
 }
 
+function generateOtp() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+async function hashOtp(otp) {
+  return await bcrypt.hash(otp, 10);
+}
+
+async function verifyOtp(otp, storedHash) {
+  if (!storedHash) return false;
+  return await bcrypt.compare(otp, storedHash);
+}
+
+function createTransporter() {
+  if (!SMTP_HOST) return null;
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined
+  });
+}
+
+async function sendOtpEmail(toEmail, otp) {
+  const transporter = createTransporter();
+  if (!transporter) {
+    throw new Error('SMTP is not configured');
+  }
+  const mailOptions = {
+    from: SMTP_FROM || SMTP_USER || 'noreply@localhost',
+    to: toEmail,
+    subject: 'Your Proforma Invoice Maker verification code',
+    text: `Your verification code is ${otp}. It expires in 5 minutes.`,
+    html: `<p>Your verification code is <strong>${otp}</strong>.</p><p>It expires in 5 minutes.</p>`
+  };
+  await transporter.sendMail(mailOptions);
+}
+
+async function getSmtpSettings() {
+  if (SMTP_HOST) {
+    return { host: SMTP_HOST, port: SMTP_PORT, user: SMTP_USER, from: SMTP_FROM };
+  }
+  return new Promise((resolve, reject) => {
+    db.all("SELECT key, value FROM settings WHERE key IN ('smtp_host','smtp_port','smtp_user','smtp_from')", (err, rows) => {
+      if (err) return reject(err);
+      const settings = {};
+      rows.forEach(r => { settings[r.key] = r.value; });
+      if (!settings.smtp_host) return resolve(null);
+      resolve({
+        host: settings.smtp_host,
+        port: parseInt(settings.smtp_port || '587', 10),
+        user: settings.smtp_user || '',
+        from: settings.smtp_from || ''
+      });
+    });
+  });
+}
+
 function initializeDatabase() {
   db.serialize(() => {
     // 1. Users Table
@@ -117,8 +182,19 @@ function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
-      role TEXT NOT NULL
+      role TEXT NOT NULL,
+      email TEXT,
+      two_factor_enabled INTEGER DEFAULT 0
     )`);
+
+    // Migrate existing users table if needed
+    const addUserColumn = (col, type) => {
+      db.run(`ALTER TABLE users ADD COLUMN ${col} ${type}`, (err) => {
+        // Ignore error if column already exists
+      });
+    };
+    addUserColumn('email', 'TEXT');
+    addUserColumn('two_factor_enabled', 'INTEGER DEFAULT 0');
 
     // 2. Settings Table
     db.run(`CREATE TABLE IF NOT EXISTS settings (
@@ -183,6 +259,17 @@ function initializeDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // 5. Two Factor Authentication Codes Table
+    db.run(`CREATE TABLE IF NOT EXISTS two_factor_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      code_hash TEXT NOT NULL,
+      expires_at DATETIME NOT NULL,
+      used INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`);
+
     // Seed default admin user if table is empty
     const seedDefaultAdmin = async () => {
       try {
@@ -197,8 +284,8 @@ function initializeDatabase() {
           const defaultAdminHash = await hashPassword('admin123');
           await new Promise((resolve, reject) => {
             db.run(
-              'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-              ['admin', defaultAdminHash, 'admin'],
+              'INSERT INTO users (username, password_hash, role, email, two_factor_enabled) VALUES (?, ?, ?, ?, ?)',
+              ['admin', defaultAdminHash, 'admin', '', 0],
               (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -238,7 +325,12 @@ function initializeDatabase() {
       { key: 'next_serial', value: '1001' },
       { key: 'next_customer_serial', value: '1001' },
       { key: 'hotel_logo', value: '' },
-      { key: 'hotel_stamp', value: '' }
+      { key: 'hotel_stamp', value: '' },
+      { key: 'smtp_host', value: '' },
+      { key: 'smtp_port', value: '587' },
+      { key: 'smtp_user', value: '' },
+      { key: 'smtp_pass', value: '' },
+      { key: 'smtp_from', value: '' }
     ];
 
     defaultSettings.forEach((item) => {
@@ -268,6 +360,41 @@ app.post('/api/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
+    if (user.two_factor_enabled) {
+      const otp = generateOtp();
+      const otpHash = await hashOtp(otp);
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      
+      await new Promise((resolve, reject) => {
+        db.run(
+          'INSERT INTO two_factor_codes (user_id, code_hash, expires_at) VALUES (?, ?, ?)',
+          [user.id, otpHash, expiresAt],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+
+      try {
+        await sendOtpEmail(user.email, otp);
+      } catch (mailErr) {
+        console.error('Failed to send OTP email:', mailErr.message);
+      }
+
+      const tempToken = jwt.sign(
+        { userId: user.id, step: '2fa' },
+        JWT_SECRET,
+        { expiresIn: '5m' }
+      );
+
+      return res.json({
+        requiresTwoFactor: true,
+        tempToken,
+        message: user.email ? 'Verification code sent to your email' : 'Two-factor authentication is enabled but no email is set'
+      });
+    }
+
     const token = generateToken(user);
     res.json({
       success: true,
@@ -280,6 +407,126 @@ app.post('/api/login', authLimiter, async (req, res) => {
   } catch (error) {
     console.error('Login error:', error.message);
     res.status(500).json({ error: 'An error occurred during login' });
+  }
+});
+
+app.post('/api/auth/request-otp', authLimiter, async (req, res) => {
+  try {
+    const { tempToken } = req.body;
+    if (!tempToken) {
+      return res.status(400).json({ error: 'tempToken is required' });
+    }
+
+    const decoded = decodeToken(tempToken);
+    if (!decoded || decoded.step !== '2fa') {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE id = ?', [decoded.userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const otp = generateOtp();
+    const otpHash = await hashOtp(otp);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        'INSERT INTO two_factor_codes (user_id, code_hash, expires_at) VALUES (?, ?, ?)',
+        [user.id, otpHash, expiresAt],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+
+    try {
+      await sendOtpEmail(user.email, otp);
+    } catch (mailErr) {
+      console.error('Failed to send OTP email:', mailErr.message);
+    }
+
+    res.json({ success: true, message: 'Verification code resent' });
+  } catch (error) {
+    console.error('Request OTP error:', error.message);
+    res.status(500).json({ error: 'An error occurred while requesting OTP' });
+  }
+});
+
+app.post('/api/auth/verify-otp', authLimiter, async (req, res) => {
+  try {
+    const { tempToken, otp } = req.body;
+    if (!tempToken || !otp) {
+      return res.status(400).json({ error: 'tempToken and otp are required' });
+    }
+
+    const decoded = decodeToken(tempToken);
+    if (!decoded || decoded.step !== '2fa') {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    const user = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM users WHERE id = ?', [decoded.userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const codeRow = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT * FROM two_factor_codes WHERE user_id = ? AND used = 0 ORDER BY id DESC LIMIT 1',
+        [user.id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    if (!codeRow) {
+      return res.status(400).json({ error: 'No active verification code. Please request a new one.' });
+    }
+
+    if (new Date(codeRow.expires_at) < new Date()) {
+      return res.status(400).json({ error: 'Verification code expired. Please request a new one.' });
+    }
+
+    const isValid = await verifyOtp(otp, codeRow.code_hash);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid verification code' });
+    }
+
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE two_factor_codes SET used = 1 WHERE id = ?', [codeRow.id], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    const token = generateToken(user);
+    res.json({
+      success: true,
+      token,
+      user: {
+        username: user.username,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Verify OTP error:', error.message);
+    res.status(500).json({ error: 'An error occurred while verifying OTP' });
   }
 });
 
@@ -323,7 +570,7 @@ app.post('/api/settings', authenticate, apiLimiter, (req, res) => {
 
 // User Management (Admin only)
 app.get('/api/users', authenticate, requireAdmin, (req, res) => {
-  db.all('SELECT id, username, role FROM users', (err, rows) => {
+  db.all('SELECT id, username, role, email, two_factor_enabled FROM users', (err, rows) => {
     if (err) {
       console.error('Error fetching users:', err.message);
       return res.status(500).json({ error: 'Failed to load users' });
@@ -334,7 +581,7 @@ app.get('/api/users', authenticate, requireAdmin, (req, res) => {
 
 app.post('/api/users', authenticate, requireAdmin, apiLimiter, async (req, res) => {
   try {
-    const { username, password, role } = req.body;
+    const { username, password, role, email, two_factor_enabled } = req.body;
     if (!username || !role) {
       return res.status(400).json({ error: 'Username and role are required' });
     }
@@ -351,8 +598,8 @@ app.post('/api/users', authenticate, requireAdmin, apiLimiter, async (req, res) 
         const hash = await hashPassword(password);
         await new Promise((resolve, reject) => {
           db.run(
-            'UPDATE users SET password_hash = ?, role = ? WHERE username = ?',
-            [hash, role, username],
+            'UPDATE users SET password_hash = ?, role = ?, email = ?, two_factor_enabled = ? WHERE username = ?',
+            [hash, role, email || '', two_factor_enabled ? 1 : 0, username],
             (err) => {
               if (err) reject(err);
               else resolve();
@@ -362,12 +609,16 @@ app.post('/api/users', authenticate, requireAdmin, apiLimiter, async (req, res) 
         res.json({ success: true, message: `User ${username} updated successfully` });
       } else {
         await new Promise((resolve, reject) => {
-          db.run('UPDATE users SET role = ? WHERE username = ?', [role, username], (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
+          db.run(
+            'UPDATE users SET role = ?, email = ?, two_factor_enabled = ? WHERE username = ?',
+            [role, email || '', two_factor_enabled ? 1 : 0, username],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
         });
-        res.json({ success: true, message: `User ${username} role updated to ${role}` });
+        res.json({ success: true, message: `User ${username} updated successfully` });
       }
     } else {
       if (!password) {
@@ -376,8 +627,8 @@ app.post('/api/users', authenticate, requireAdmin, apiLimiter, async (req, res) 
       const hash = await hashPassword(password);
       await new Promise((resolve, reject) => {
         db.run(
-          'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-          [username, hash, role],
+          'INSERT INTO users (username, password_hash, role, email, two_factor_enabled) VALUES (?, ?, ?, ?, ?)',
+          [username, hash, role, email || '', two_factor_enabled ? 1 : 0],
           (err) => {
             if (err) {
               if (err.message.includes('UNIQUE')) {
