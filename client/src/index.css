@@ -1,0 +1,216 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Default theme tokens (Original) ── */
+:root {
+  --bg-base:        #0f172a;
+  --bg-card:        #1e293b;
+  --bg-input:       #334155;
+  --border:         #334155;
+  --text-primary:   #f1f5f9;
+  --text-muted:     #94a3b8;
+  --accent:         #2563eb;
+  --accent-hover:   #1d4ed8;
+  --accent-text:    #ffffff;
+  --sidebar-bg:     #1e293b;
+  --sidebar-border: #334155;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--app-font, 'Inter', system-ui, sans-serif);
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-card); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { opacity: 0.8; }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+           transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed
+           focus:outline-none focus:ring-2 focus:ring-offset-2;
+    focus-ring-offset-color: var(--bg-base);
+  }
+  .btn-primary {
+    @apply btn;
+    background-color: var(--accent);
+    color: var(--accent-text);
+  }
+  .btn-primary:hover:not(:disabled) { background-color: var(--accent-hover); }
+
+  .btn-secondary {
+    @apply btn;
+    background-color: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover:not(:disabled) { opacity: 0.85; }
+
+  .btn-danger {
+    @apply btn bg-red-600 hover:bg-red-700 text-white focus:ring-red-500;
+  }
+  .btn-ghost {
+    @apply btn;
+    background: transparent;
+    color: var(--text-muted);
+  }
+  .btn-ghost:hover:not(:disabled) { background-color: var(--bg-input); color: var(--text-primary); }
+
+  .input {
+    @apply w-full rounded-lg px-3 py-2 text-sm transition
+           focus:outline-none focus:ring-2 focus:border-transparent;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    focus-ring-color: var(--accent);
+  }
+  .input::placeholder { color: var(--text-muted); }
+
+  .label {
+    @apply block text-sm font-medium mb-1;
+    color: var(--text-muted);
+  }
+
+  .card {
+    @apply rounded-xl p-6;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .alert-error {
+    @apply rounded-lg px-4 py-3 text-sm;
+    background-color: #7f1d1d33;
+    border: 1px solid #ef444466;
+    color: #fca5a5;
+  }
+  .alert-success {
+    @apply rounded-lg px-4 py-3 text-sm;
+    background-color: #14532d33;
+    border: 1px solid #22c55e66;
+    color: #86efac;
+  }
+
+  .badge { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium; }
+  .badge-blue   { background-color: #1e3a8a55; color: #93c5fd; }
+  .badge-green  { background-color: #14532d55; color: #86efac; }
+  .badge-yellow { background-color: #78350f55; color: #fde68a; }
+  .badge-slate  { background-color: var(--bg-input); color: var(--text-muted); }
+
+  /* Sidebar uses its own tokens */
+  .sidebar-themed {
+    background-color: var(--sidebar-bg);
+    border-right: 1px solid var(--sidebar-border);
+  }
+  .nav-active {
+    background-color: var(--accent);
+    color: var(--accent-text) !important;
+  }
+  .nav-inactive {
+    color: var(--text-muted);
+  }
+  .nav-inactive:hover {
+    background-color: var(--bg-input);
+    color: var(--text-primary);
+  }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 12mm 15mm 15mm 15mm;
+}
+
+/* Landscape print page override for Summary Reports */
+@page landscape-page {
+  size: A4 landscape;
+  margin: 10mm 12mm 12mm 12mm;
+}
+
+.print-landscape {
+  page: landscape-page;
+}
+
+/* Print styles — ensure ONLY the printable invoice renders on PDF print */
+@media print {
+  /* Dynamic page orientation override when print-landscape is present */
+  body:has(.print-landscape) {
+    @page {
+      size: A4 landscape;
+      margin: 10mm 12mm 12mm 12mm;
+    }
+  }
+  /* Hide the entire main React application tree inside #root */
+  #root,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset html & body for clean print */
+  html, body {
+    background: white !important;
+    color: black !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Portal modal overlay container */
+  .printable-modal-overlay {
+    position: static !important;
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Portal modal card container */
+  .printable-modal-card {
+    position: static !important;
+    max-width: none !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+    display: block !important;
+    overflow: visible !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+  }
+
+  /* Printable invoice sheet styling for A4 paper */
+  .printable-invoice {
+    position: static !important;
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Footer anchored at bottom of pages */
+  .print-footer {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: white !important;
+    padding-top: 8px !important;
+    border-top: 1px solid #cbd5e1 !important;
+  }
+}
