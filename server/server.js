@@ -1,15 +1,15 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
-const express    = require('express');
-const helmet     = require('helmet');
-const cors       = require('cors');
-const rateLimit  = require('express-rate-limit');
+const express = require('express');
+const helmet = require('helmet');
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
-const authRoutes     = require('./routes/authRoutes');
-const invoiceRoutes  = require('./routes/invoiceRoutes');
+const authRoutes = require('./routes/authRoutes');
+const invoiceRoutes = require('./routes/invoiceRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
-const userRoutes     = require('./routes/userRoutes');
-const presetRoutes   = require('./routes/presetRoutes');
+const userRoutes = require('./routes/userRoutes');
+const presetRoutes = require('./routes/presetRoutes');
 
 const app = express();
 
@@ -21,12 +21,12 @@ app.use(cors({
   origin: process.env.NODE_ENV === 'production'
     ? process.env.CLIENT_ORIGIN
     : (origin, callback) => {
-        if (!origin || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
+      if (!origin || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
   credentials: true
 }));
 
@@ -34,16 +34,16 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Rate limiters
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20,  message: { error: 'Too many requests. Try again in 15 minutes.' } });
-const apiLimiter  = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, message: { error: 'Too many requests. Try again in 15 minutes.' } });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Too many requests. Try again in 15 minutes.' } });
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, message: { error: 'Too many requests. Try again in 15 minutes.' } });
 
 // Routes
-app.use('/api/auth',      authLimiter, authRoutes);
-app.use('/api/invoices',  apiLimiter,  invoiceRoutes);
-app.use('/api/customers', apiLimiter,  customerRoutes);
-app.use('/api/settings',  apiLimiter,  settingsRoutes);
-app.use('/api/users',     apiLimiter,  userRoutes);
-app.use('/api/presets',   apiLimiter,  presetRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/invoices', apiLimiter, invoiceRoutes);
+app.use('/api/customers', apiLimiter, customerRoutes);
+app.use('/api/settings', apiLimiter, settingsRoutes);
+app.use('/api/users', apiLimiter, userRoutes);
+app.use('/api/presets', apiLimiter, presetRoutes);
 
 const path = require('path');
 
@@ -74,7 +74,7 @@ app.listen(PORT, async () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   Database: ${process.env.DATABASE_URL?.replace(/:([^:@]+)@/, ':***@')}`);
-  
+
   // Auto-run schema migration on server launch
   try {
     await autoMigrate(false);
