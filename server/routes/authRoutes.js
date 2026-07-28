@@ -6,14 +6,19 @@ const {
   verifyTwoFactor,
   setupTwoFactor,
   confirmTwoFactor,
+  forgotPassword,
+  resetPassword,
   me
 } = require('../controllers/authController');
 
-router.post('/register',    register);
-router.post('/login',       login);
-router.post('/verify-2fa',  verifyTwoFactor);
-router.post('/setup-2fa',   verifyToken, setupTwoFactor);
-router.post('/confirm-2fa', verifyToken, confirmTwoFactor);
-router.get('/me',           verifyToken, me);
+router.post('/register',        register);
+router.post('/login',           login);
+router.post('/verify-2fa',      verifyTwoFactor);
+router.post('/setup-2fa',       verifyToken, setupTwoFactor);
+router.post('/confirm-2fa',     verifyToken, confirmTwoFactor);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password',  resetPassword);
+router.get('/me',               verifyToken, me);
 
 module.exports = router;
+

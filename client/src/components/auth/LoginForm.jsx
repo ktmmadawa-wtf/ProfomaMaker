@@ -82,10 +82,15 @@ export default function LoginForm() {
         </div>
 
         <div className="card">
-          {/* Success message after registration */}
+          {/* Success message after registration or password reset */}
           {params.get('registered') === '1' && step === 1 && (
             <div className="alert-success mb-4">
               Account created successfully! You can now sign in.
+            </div>
+          )}
+          {params.get('reset') === '1' && step === 1 && (
+            <div className="alert-success mb-4">
+              Password reset successfully! You can now sign in with your new password.
             </div>
           )}
 
@@ -108,7 +113,15 @@ export default function LoginForm() {
               </div>
 
               <div>
-                <label className="label">Password</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="label mb-0">Password</label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs text-blue-400 hover:text-blue-300 transition font-medium"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 <input
                   type="password"
                   required

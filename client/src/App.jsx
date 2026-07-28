@@ -3,9 +3,10 @@ import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './router/ProtectedRoute';
 
 // Auth pages
-import RegisterForm    from './components/auth/RegisterForm';
-import LoginForm       from './components/auth/LoginForm';
-import TwoFactorSetup  from './components/auth/TwoFactorSetup';
+import RegisterForm       from './components/auth/RegisterForm';
+import LoginForm          from './components/auth/LoginForm';
+import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
+import TwoFactorSetup     from './components/auth/TwoFactorSetup';
 
 // App layout + views
 import AppLayout       from './components/layout/AppLayout';
@@ -30,6 +31,10 @@ export default function App() {
         path="/login"
         element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginForm />}
       />
+      <Route
+        path="/forgot-password"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <ForgotPasswordForm />}
+      />
 
       {/* Protected routes — any authenticated user */}
       <Route element={<ProtectedRoute />}>
@@ -38,11 +43,11 @@ export default function App() {
           <Route path="/invoices"   element={<InvoiceCreator />} />
           <Route path="/history"    element={<InvoiceHistory />} />
           <Route path="/customers"  element={<CustomerManager />} />
+          <Route path="/settings"   element={<SettingsPanel />} />
           <Route path="/setup-2fa"  element={<TwoFactorSetup />} />
 
           {/* Admin-only routes */}
           <Route element={<ProtectedRoute adminOnly />}>
-            <Route path="/settings" element={<SettingsPanel />} />
             <Route path="/users"    element={<UserManager />} />
           </Route>
         </Route>

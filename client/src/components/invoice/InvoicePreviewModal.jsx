@@ -77,8 +77,34 @@ export default function InvoicePreviewModal({ invoice, onClose }) {
     hour12: true
   });
 
+  // Sanitizes invoice number and company name for PDF filename format: PI-{invoiceNumber} {companyName}.pdf
+  const sanitizePdfFileName = (invoiceNum, company) => {
+    const rawNum = String(invoiceNum || '').replace(/^PI-?/i, '').trim();
+    const rawCompany = String(company || '').trim();
+    
+    // Combine format
+    let name = `PI-${rawNum} ${rawCompany}`;
+
+    // Remove forbidden characters: \ / : * ? " < > |
+    name = name.replace(/[\\\/:\*\?"<>\|]/g, '-');
+    
+    // Replace multiple spaces or hyphens cleanly
+    name = name.replace(/\s+/g, ' ').replace(/-+/g, '-').trim();
+
+    return name;
+  };
+
   const handlePrint = () => {
+    const originalTitle = document.title;
+    const pdfFileName = sanitizePdfFileName(invoice.invoice_number, invoice.company_name);
+    
+    document.title = pdfFileName;
     window.print();
+
+    // Restore original document title after print dialog opens/closes
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
   };
 
   const isRtl = langMode === 'arabic';
@@ -243,6 +269,7 @@ export default function InvoicePreviewModal({ invoice, onClose }) {
                     <>
                       <th className="p-3 border-b text-center">{t('Start', 'البداية')}</th>
                       <th className="p-3 border-b text-center">{t('End', 'النهاية')}</th>
+                      <th className="p-3 border-b text-center">{t('Days', 'الأيام')}</th>
                       <th className="p-3 border-b text-center">{t('Pax', 'الأشخاص')}</th>
                       <th className={`p-3 border-b ${isRtl ? 'text-left' : 'text-right'}`}>{t('Per Pax', 'للفرد')}</th>
                       <th className={`p-3 border-b ${isRtl ? 'text-left' : 'text-right'}`}>{t('Rental', 'الإيجار')}</th>
@@ -250,6 +277,9 @@ export default function InvoicePreviewModal({ invoice, onClose }) {
                   )}
                   {invoice.invoice_type === 'misc' && (
                     <>
+                      <th className="p-3 border-b text-center">{t('Start', 'البداية')}</th>
+                      <th className="p-3 border-b text-center">{t('End', 'النهاية')}</th>
+                      <th className="p-3 border-b text-center">{t('Days', 'الأيام')}</th>
                       <th className="p-3 border-b text-center">{t('Qty', 'الكمية')}</th>
                       <th className={`p-3 border-b ${isRtl ? 'text-left' : 'text-right'}`}>{t('Unit Price', 'سعر الوحدة')}</th>
                     </>
@@ -260,7 +290,7 @@ export default function InvoicePreviewModal({ invoice, onClose }) {
               <tbody className="divide-y divide-slate-200 text-slate-800">
                 {items.map((item, idx) => (
                   <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                    <td className={`p-3 font-medium ${isRtl ? 'text-right' : 'text-left'}`}>{item.description || '—'}</td>
+                    <td className={`p-3 font-medium whitespace-pre-line ${isRtl ? 'text-right' : 'text-left'}`}>{item.description || '—'}</td>
                     
                     {invoice.invoice_type === 'room' && (
                       <>
@@ -275,6 +305,7 @@ export default function InvoicePreviewModal({ invoice, onClose }) {
                       <>
                         <td className="p-3 text-center text-slate-600">{item.start_date || '—'}</td>
                         <td className="p-3 text-center text-slate-600">{item.end_date || '—'}</td>
+                        <td className="p-3 text-center font-mono">{item.days || '1'}</td>
                         <td className="p-3 text-center font-mono">{item.pax || '0'}</td>
                         <td className={`p-3 font-mono ${isRtl ? 'text-left' : 'text-right'}`}>{parseFloat(item.pax_charge || 0).toFixed(2)}</td>
                         <td className={`p-3 font-mono ${isRtl ? 'text-left' : 'text-right'}`}>{parseFloat(item.rental || 0).toFixed(2)}</td>
@@ -283,6 +314,9 @@ export default function InvoicePreviewModal({ invoice, onClose }) {
 
                     {invoice.invoice_type === 'misc' && (
                       <>
+                        <td className="p-3 text-center text-slate-600">{item.start_date || '—'}</td>
+                        <td className="p-3 text-center text-slate-600">{item.end_date || '—'}</td>
+                        <td className="p-3 text-center font-mono">{item.days || '1'}</td>
                         <td className="p-3 text-center font-mono">{item.quantity || '0'}</td>
                         <td className={`p-3 font-mono ${isRtl ? 'text-left' : 'text-right'}`}>{parseFloat(item.unit_price || 0).toFixed(2)}</td>
                       </>

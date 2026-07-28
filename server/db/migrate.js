@@ -1,7 +1,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const pool = require('./pool');
 
-async function migrate() {
+async function migrate(closePool = false) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -9,15 +9,21 @@ async function migrate() {
     // Users
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id               SERIAL PRIMARY KEY,
-        email            TEXT UNIQUE NOT NULL,
-        password_hash    TEXT NOT NULL,
-        role             TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
-        twofa_secret     TEXT,
-        is_2fa_enabled   BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        id                 SERIAL PRIMARY KEY,
+        email              TEXT UNIQUE NOT NULL,
+        password_hash      TEXT NOT NULL,
+        role               TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+        twofa_secret       TEXT,
+        is_2fa_enabled     BOOLEAN NOT NULL DEFAULT FALSE,
+        reset_code         TEXT,
+        reset_code_expires TIMESTAMPTZ,
+        created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+
+    // Ensure reset columns exist for previously created DBs
+    await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code TEXT');
+    await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code_expires TIMESTAMPTZ');
 
     // Settings
     await client.query(`

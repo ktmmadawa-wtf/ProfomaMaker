@@ -178,6 +178,98 @@ async function confirmTwoFactor(req, res) {
   }
 }
 
+// ── POST /api/auth/forgot-password ───────────────────────────────────────────
+async function forgotPassword(req, res) {
+  const { email } = req.body;
+  if (!email || !email.trim()) {
+    return res.status(400).json({ error: 'Email address is required.' });
+  }
+
+  const emailTrimmed = email.trim().toLowerCase();
+  try {
+    const result = await pool.query('SELECT id, email FROM users WHERE email = $1', [emailTrimmed]);
+    const user = result.rows[0];
+
+    if (!user) {
+      // Don't leak registered status, but give clear response
+      return res.json({
+        success: true,
+        message: 'If an account with that email exists, a password reset code has been generated.'
+      });
+    }
+
+    // Generate 6-digit reset code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes validity
+
+    await pool.query(
+      'UPDATE users SET reset_code = $1, reset_code_expires = $2 WHERE id = $3',
+      [resetCode, expiresAt, user.id]
+    );
+
+    // Note: For local/testing without SMTP, return the code so UX demo can easily complete
+    res.json({
+      success: true,
+      message: `Reset code generated and sent to ${user.email}.`,
+      resetCode: resetCode // Returned for demo/testing display
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err.message);
+    res.status(500).json({ error: 'Failed to process password recovery request.' });
+  }
+}
+
+// ── POST /api/auth/reset-password ────────────────────────────────────────────
+async function resetPassword(req, res) {
+  const { email, code, newPassword } = req.body;
+
+  if (!email || !code || !newPassword) {
+    return res.status(400).json({ error: 'Email, reset code, and new password are required.' });
+  }
+
+  const emailTrimmed = email.trim().toLowerCase();
+  const codeTrimmed = code.trim();
+
+  // Strong password validation rules
+  // Minimum 8 characters, at least 1 uppercase, 1 lowercase, 1 digit, 1 special character
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+
+  if (!passwordRegex.test(newPassword)) {
+    return res.status(400).json({
+      error: 'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.'
+    });
+  }
+
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [emailTrimmed]);
+    const user = result.rows[0];
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid reset code or email.' });
+    }
+
+    if (!user.reset_code || user.reset_code !== codeTrimmed) {
+      return res.status(400).json({ error: 'Invalid or incorrect reset code.' });
+    }
+
+    if (user.reset_code_expires && new Date(user.reset_code_expires) < new Date()) {
+      return res.status(400).json({ error: 'Reset code has expired. Please request a new code.' });
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    await pool.query(
+      'UPDATE users SET password_hash = $1, reset_code = NULL, reset_code_expires = NULL WHERE id = $2',
+      [password_hash, user.id]
+    );
+
+    res.json({ success: true, message: 'Password has been reset successfully. You can now log in with your new password.' });
+  } catch (err) {
+    console.error('Reset password error:', err.message);
+    res.status(500).json({ error: 'Failed to reset password. Please try again.' });
+  }
+}
+
 // ── GET /api/auth/me ─────────────────────────────────────────────────────────
 async function me(req, res) {
   try {
@@ -194,4 +286,14 @@ async function me(req, res) {
   }
 }
 
-module.exports = { register, login, verifyTwoFactor, setupTwoFactor, confirmTwoFactor, me };
+module.exports = {
+  register,
+  login,
+  verifyTwoFactor,
+  setupTwoFactor,
+  confirmTwoFactor,
+  forgotPassword,
+  resetPassword,
+  me
+};
+

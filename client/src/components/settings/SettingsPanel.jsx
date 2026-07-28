@@ -99,7 +99,7 @@ function ImageUpload({ label, preview, onFileChange, onClear, inputRef, hint }) 
 }
 
 export default function SettingsPanel() {
-  const { api } = useAuth();
+  const { api, isAdmin } = useAuth();
   const [settings,  setSettings]  = useState({});
   const [loading,   setLoading]   = useState(true);
   const [saving,    setSaving]    = useState(false);
@@ -162,7 +162,9 @@ export default function SettingsPanel() {
       <div>
         <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Settings</h1>
         <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-          Configure hotel details, appearance, and invoice branding.
+          {isAdmin
+            ? 'Configure hotel details, appearance, line item presets, and invoice branding.'
+            : 'Customize application theme and typography font preferences.'}
         </p>
       </div>
 
@@ -171,7 +173,7 @@ export default function SettingsPanel() {
 
       <form onSubmit={save} className="space-y-6">
 
-        {/* ── Appearance — Theme ── */}
+        {/* ── Appearance — Theme (Available to all users) ── */}
         <Section title="Appearance — Theme">
           <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
             Choose a colour theme for the application. Your preference is saved locally.
@@ -179,7 +181,7 @@ export default function SettingsPanel() {
           <ThemeSelector />
         </Section>
 
-        {/* ── Appearance — Typography & Font ── */}
+        {/* ── Appearance — Typography & Font (Available to all users) ── */}
         <Section title="Appearance — Typography & Font">
           <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
             Choose a font family for the application interface.
@@ -187,77 +189,82 @@ export default function SettingsPanel() {
           <FontSelector />
         </Section>
 
-        {/* ── Branding / Images ── */}
-        <Section title="Invoice Branding">
-          <Grid cols={2}>
-            <ImageUpload
-              label="Company Logo"
-              preview={logoPreview}
-              onFileChange={e => handleImageFile(e.target.files[0], 'hotel_logo', setLogoPreview)}
-              onClear={() => clearImage('hotel_logo', setLogoPreview, logoRef)}
-              inputRef={logoRef}
-              hint="Appears at the top of every printed invoice. PNG or SVG recommended."
-            />
-            <ImageUpload
-              label="Company Stamp / Seal"
-              preview={stampPreview}
-              onFileChange={e => handleImageFile(e.target.files[0], 'hotel_stamp', setStampPreview)}
-              onClear={() => clearImage('hotel_stamp', setStampPreview, stampRef)}
-              inputRef={stampRef}
-              hint="Appears at the bottom of every printed invoice. Use a transparent PNG."
-            />
-          </Grid>
-        </Section>
+        {/* Admin-only sections */}
+        {isAdmin && (
+          <>
+            {/* ── Branding / Images ── */}
+            <Section title="Invoice Branding">
+              <Grid cols={2}>
+                <ImageUpload
+                  label="Company Logo"
+                  preview={logoPreview}
+                  onFileChange={e => handleImageFile(e.target.files[0], 'hotel_logo', setLogoPreview)}
+                  onClear={() => clearImage('hotel_logo', setLogoPreview, logoRef)}
+                  inputRef={logoRef}
+                  hint="Appears at the top of every printed invoice. PNG or SVG recommended."
+                />
+                <ImageUpload
+                  label="Company Stamp / Seal"
+                  preview={stampPreview}
+                  onFileChange={e => handleImageFile(e.target.files[0], 'hotel_stamp', setStampPreview)}
+                  onClear={() => clearImage('hotel_stamp', setStampPreview, stampRef)}
+                  inputRef={stampRef}
+                  hint="Appears at the bottom of every printed invoice. Use a transparent PNG."
+                />
+              </Grid>
+            </Section>
 
-        {/* ── Hotel Info ── */}
-        <Section title="Hotel Information">
-          <Grid>
-            <Field label="Hotel Name"  value={settings.hotel_name} onChange={setField('hotel_name')} />
-            <Field label="VAT Number"  value={settings.vat_number} onChange={setField('vat_number')} />
-            <Field label="Address 1"   value={settings.address_1}  onChange={setField('address_1')} />
-            <Field label="Address 2"   value={settings.address_2}  onChange={setField('address_2')} />
-            <Field label="Address 3"   value={settings.address_3}  onChange={setField('address_3')} />
-            <Field label="City"        value={settings.city}       onChange={setField('city')} />
-            <Field label="Country"     value={settings.country}    onChange={setField('country')} />
-            <Field label="Phone"       value={settings.phone}      onChange={setField('phone')} />
-            <Field label="Email"       type="email" value={settings.email} onChange={setField('email')} />
-            <Field label="Website"     value={settings.website}    onChange={setField('website')} />
-          </Grid>
-        </Section>
+            {/* ── Hotel Info ── */}
+            <Section title="Hotel Information">
+              <Grid>
+                <Field label="Hotel Name"  value={settings.hotel_name} onChange={setField('hotel_name')} />
+                <Field label="VAT Number"  value={settings.vat_number} onChange={setField('vat_number')} />
+                <Field label="Address 1"   value={settings.address_1}  onChange={setField('address_1')} />
+                <Field label="Address 2"   value={settings.address_2}  onChange={setField('address_2')} />
+                <Field label="Address 3"   value={settings.address_3}  onChange={setField('address_3')} />
+                <Field label="City"        value={settings.city}       onChange={setField('city')} />
+                <Field label="Country"     value={settings.country}    onChange={setField('country')} />
+                <Field label="Phone"       value={settings.phone}      onChange={setField('phone')} />
+                <Field label="Email"       type="email" value={settings.email} onChange={setField('email')} />
+                <Field label="Website"     value={settings.website}    onChange={setField('website')} />
+              </Grid>
+            </Section>
 
-        {/* ── Bank Details ── */}
-        <Section title="Bank Details">
-          <Grid>
-            <Field label="Account Name"   value={settings.account_name}   onChange={setField('account_name')} />
-            <Field label="Account Number" value={settings.account_number} onChange={setField('account_number')} />
-            <Field label="IBAN"           value={settings.iban_number}    onChange={setField('iban_number')} />
-            <Field label="Bank Name"      value={settings.bank_name}      onChange={setField('bank_name')} />
-            <Field label="Branch"         value={settings.branch_name}    onChange={setField('branch_name')} />
-            <Field label="SWIFT Code"     value={settings.swift_code}     onChange={setField('swift_code')} />
-          </Grid>
-          <div>
-            <label className="label text-xs">Payment Terms</label>
-            <textarea rows={2} className={`${inputCls} resize-none`}
-              value={settings.payment_terms || ''} onChange={setField('payment_terms')} />
-          </div>
-        </Section>
+            {/* ── Bank Details ── */}
+            <Section title="Bank Details">
+              <Grid>
+                <Field label="Account Name"   value={settings.account_name}   onChange={setField('account_name')} />
+                <Field label="Account Number" value={settings.account_number} onChange={setField('account_number')} />
+                <Field label="IBAN"           value={settings.iban_number}    onChange={setField('iban_number')} />
+                <Field label="Bank Name"      value={settings.bank_name}      onChange={setField('bank_name')} />
+                <Field label="Branch"         value={settings.branch_name}    onChange={setField('branch_name')} />
+                <Field label="SWIFT Code"     value={settings.swift_code}     onChange={setField('swift_code')} />
+              </Grid>
+              <div>
+                <label className="label text-xs">Payment Terms</label>
+                <textarea rows={2} className={`${inputCls} resize-none`}
+                  value={settings.payment_terms || ''} onChange={setField('payment_terms')} />
+              </div>
+            </Section>
 
-        {/* ── Invoice Numbering ── */}
-        <Section title="Invoice Numbering">
-          <Grid>
-            <Field label="Serial Prefix"   value={settings.serial_prefix}        onChange={setField('serial_prefix')}        placeholder="PI-" />
-            <Field label="Next Invoice #"  value={settings.next_serial}          onChange={setField('next_serial')}          placeholder="1001" />
-            <Field label="Next Customer #" value={settings.next_customer_serial} onChange={setField('next_customer_serial')} placeholder="1001" />
-          </Grid>
-        </Section>
+            {/* ── Invoice Numbering ── */}
+            <Section title="Invoice Numbering">
+              <Grid>
+                <Field label="Serial Prefix"   value={settings.serial_prefix}        onChange={setField('serial_prefix')}        placeholder="PI-" />
+                <Field label="Next Invoice #"  value={settings.next_serial}          onChange={setField('next_serial')}          placeholder="1001" />
+                <Field label="Next Customer #" value={settings.next_customer_serial} onChange={setField('next_customer_serial')} placeholder="1001" />
+              </Grid>
+            </Section>
 
-        <button type="submit" disabled={saving} className="btn-primary">
-          {saving ? 'Saving…' : 'Save Settings'}
-        </button>
+            <button type="submit" disabled={saving} className="btn-primary">
+              {saving ? 'Saving…' : 'Save Settings'}
+            </button>
+          </>
+        )}
       </form>
 
-      {/* ── Line Item Presets Section ── */}
-      <PresetManagerSection api={api} />
+      {/* ── Line Item Presets Section (Admin only) ── */}
+      {isAdmin && <PresetManagerSection api={api} />}
     </div>
   );
 }
