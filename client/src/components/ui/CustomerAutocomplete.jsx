@@ -118,6 +118,9 @@ export default function CustomerAutocomplete({
   };
 
   const handleKeyDown = (e) => {
+    // Always stop propagation so keystrokes never leak to Windows/browser chrome
+    e.stopPropagation();
+
     if (!isOpen || suggestions.length === 0) {
       if (e.key === 'ArrowDown') {
         setIsOpen(true);
@@ -137,8 +140,10 @@ export default function CustomerAutocomplete({
         handleSelect(suggestions[activeIndex]);
       }
     } else if (e.key === 'Escape') {
+      e.preventDefault();
       setIsOpen(false);
       setActiveIndex(-1);
+      inputRef.current?.blur();
     }
   };
 
@@ -176,9 +181,20 @@ export default function CustomerAutocomplete({
           onChange={handleInputChange}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
+          onClick={() => inputRef.current?.focus()}
+          onMouseDown={(e) => {
+            // Claim focus explicitly on mousedown so the OS never intercepts
+            if (document.activeElement !== inputRef.current) {
+              e.preventDefault();
+              inputRef.current?.focus();
+            }
+          }}
           placeholder={placeholder}
           required={required}
-          className="bg-slate-700 border border-slate-600 rounded-lg pl-9 pr-8 py-2 text-white text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-400 transition"
+          autoComplete="off"
+          spellCheck={false}
+          tabIndex={0}
+          className="bg-slate-700 border border-slate-600 rounded-lg pl-9 pr-8 py-2 text-white text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-400 transition cursor-text"
         />
 
         {/* Clear Button */}
@@ -204,7 +220,11 @@ export default function CustomerAutocomplete({
             return (
               <div
                 key={c.id || index}
-                onClick={() => handleSelect(c)}
+                onMouseDown={(e) => {
+                  // Prevent blur on the input before selection fires
+                  e.preventDefault();
+                  handleSelect(c);
+                }}
                 onMouseEnter={() => setActiveIndex(index)}
                 className={`px-4 py-2.5 cursor-pointer flex items-center justify-between text-sm transition-colors ${
                   isActive
