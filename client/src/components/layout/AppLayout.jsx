@@ -2,16 +2,6 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-function FlipCard({ value }) {
-  return (
-    <div className="relative inline-flex items-center justify-center px-1.5 py-0.5 bg-slate-800/90 border border-slate-700/80 rounded shadow-sm font-mono text-[11px] font-bold text-white tracking-wider select-none overflow-hidden min-w-[22px]">
-      <div className="absolute inset-x-0 top-0 h-[50%] bg-white/[0.06]" />
-      <div className="absolute inset-x-0 top-1/2 border-t border-slate-950/80 shadow-[0_1px_0_rgba(255,255,255,0.06)]" />
-      <span className="relative z-10 leading-none">{value}</span>
-    </div>
-  );
-}
-
 function LiveClock({ className = '' }) {
   const [now, setNow] = useState(new Date());
 
@@ -36,22 +26,20 @@ function LiveClock({ className = '' }) {
   const seconds = String(now.getSeconds()).padStart(2, '0');
 
   return (
-    <div className={`flex flex-nowrap items-center gap-1.5 whitespace-nowrap select-none ${className}`}>
-      {/* Date Flip Card */}
-      <div className="relative inline-flex items-center justify-center px-2 py-0.5 bg-slate-800/90 border border-slate-700/80 rounded shadow-sm font-mono text-[11px] font-medium text-slate-300 tracking-tight overflow-hidden flex-shrink-0">
-        <div className="absolute inset-x-0 top-0 h-[50%] bg-white/[0.06]" />
-        <div className="absolute inset-x-0 top-1/2 border-t border-slate-950/80 shadow-[0_1px_0_rgba(255,255,255,0.06)]" />
-        <span className="relative z-10 leading-none">{weekday} {day} {month} {year}</span>
+    <div className={`w-full flex items-center justify-between gap-1.5 whitespace-nowrap select-none ${className}`}>
+      {/* Modern Date Pill - Justified Left */}
+      <div className="flex-1 flex items-center justify-center px-1.5 py-1 bg-slate-800/90 border border-slate-700/70 rounded-lg text-slate-300 font-mono text-[10.5px] font-medium shadow-sm text-center">
+        <span>{weekday} {day} {month} {year}</span>
       </div>
 
-      <span className="text-slate-600 font-bold text-xs flex-shrink-0">•</span>
-
-      {/* Time Flip Cards */}
-      <div className="flex items-center gap-0.5 flex-shrink-0">
-        <FlipCard value={formattedHours} />
-        <span className="text-slate-500 font-bold text-[10px] animate-pulse mx-0.5">:</span>
-        <FlipCard value={minutes} />
-        <span className="ml-1 text-[10px] font-bold text-blue-400 uppercase tracking-wider">{ampm}</span>
+      {/* Modern Time Pill with Seconds - Justified Right */}
+      <div className="flex-1 flex items-center justify-center gap-0.5 px-1.5 py-1 bg-slate-800/90 border border-slate-700/70 rounded-lg text-slate-300 font-mono text-[10.5px] font-medium shadow-sm text-center">
+        <span>{formattedHours}</span>
+        <span className="opacity-60 animate-pulse">:</span>
+        <span>{minutes}</span>
+        <span className="opacity-60 animate-pulse">:</span>
+        <span>{seconds}</span>
+        <span className="ml-1 text-[9.5px] font-semibold uppercase tracking-wider">{ampm}</span>
       </div>
     </div>
   );

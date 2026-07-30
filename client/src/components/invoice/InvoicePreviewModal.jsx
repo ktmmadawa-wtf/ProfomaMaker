@@ -135,11 +135,11 @@ export default function InvoicePreviewModal({ invoice, onClose }) {
   const email = settings?.email || 'reservations@lotuspalace.com';
   const website = settings?.website || 'www.lotuspalace.com';
   const vatNumber = settings?.vat_number || '310123456700003';
-  const bankName = settings?.bank_name || '';
-  const accountName = settings?.account_name || '';
-  const accountNumber = settings?.account_number || '';
-  const ibanNumber = settings?.iban_number || '';
-  const swiftCode = settings?.swift_code || '';
+  const bankName = settings?.bank_name || 'Al Rajhi Bank - مصرف الراجحي';
+  const accountName = settings?.account_name || 'MANSARD HOTEL COMPANY - شركة فندق منسارد';
+  const accountNumber = settings?.account_number || '992000010006080000131';
+  const ibanNumber = settings?.iban_number || 'SA37 8000 0992 6080 1000 0131';
+  const swiftCode = settings?.swift_code || 'RJHISARI';
   const paymentTerms = settings?.payment_terms || 'Please make payment within 7 days of invoice date.';
   const hotelLogo = settings?.hotel_logo || '';
   const hotelStamp = settings?.hotel_stamp || '';
@@ -532,61 +532,61 @@ export default function InvoicePreviewModal({ invoice, onClose }) {
 
               {bankName && (
                 langMode === 'bilingual' ? (
-                  <div className="flex justify-between items-center gap-2">
+                  <div className="flex justify-between items-center gap-2 text-xs">
                     <span className="text-slate-500">Bank Name:</span>
-                    <strong className="text-slate-900 text-center">{bankName}</strong>
+                    <strong className="text-slate-900 text-center font-bold text-xs">{bankName}</strong>
                     <span className="text-slate-500" dir="rtl">:اسم البنك</span>
                   </div>
                 ) : (
-                  <p><span className="text-slate-500">{t('Bank Name', 'اسم البنك')}:</span> <strong>{bankName}</strong></p>
+                  <p className="text-xs"><span className="text-slate-500">{t('Bank Name', 'اسم البنك')}:</span> <strong className="font-bold text-xs">{bankName}</strong></p>
                 )
               )}
 
               {accountName && (
                 langMode === 'bilingual' ? (
-                  <div className="flex justify-between items-center gap-2">
+                  <div className="flex justify-between items-center gap-2 text-xs">
                     <span className="text-slate-500">Account Name:</span>
-                    <strong className="text-slate-900 text-center">{accountName}</strong>
+                    <strong className="text-slate-900 text-center font-bold text-xs">{accountName}</strong>
                     <span className="text-slate-500" dir="rtl">:اسم الحساب</span>
                   </div>
                 ) : (
-                  <p><span className="text-slate-500">{t('Account Name', 'اسم الحساب')}:</span> <strong>{accountName}</strong></p>
+                  <p className="text-xs"><span className="text-slate-500">{t('Account Name', 'اسم الحساب')}:</span> <strong className="font-bold text-xs">{accountName}</strong></p>
                 )
               )}
 
               {accountNumber && (
                 langMode === 'bilingual' ? (
-                  <div className="flex justify-between items-center gap-2">
+                  <div className="flex justify-between items-center gap-2 text-xs">
                     <span className="text-slate-500">Account No:</span>
-                    <strong className="font-mono text-slate-900 text-center">{accountNumber}</strong>
+                    <strong className="font-mono text-slate-900 text-center font-bold text-xs">{formatNum(accountNumber)}</strong>
                     <span className="text-slate-500" dir="rtl">:رقم الحساب</span>
                   </div>
                 ) : (
-                  <p><span className="text-slate-500">{t('Account No', 'رقم الحساب')}:</span> <strong className="font-mono">{accountNumber}</strong></p>
+                  <p className="text-xs"><span className="text-slate-500">{t('Account No', 'رقم الحساب')}:</span> <strong className="font-mono font-bold text-xs">{formatNum(accountNumber)}</strong></p>
                 )
               )}
 
               {ibanNumber && (
                 langMode === 'bilingual' ? (
-                  <div className="flex justify-between items-center gap-2">
+                  <div className="flex justify-between items-center gap-2 text-xs">
                     <span className="text-slate-500">IBAN:</span>
-                    <strong className="font-mono text-slate-900 text-center">{ibanNumber}</strong>
+                    <strong className="font-mono text-slate-900 text-center font-bold text-xs">{formatNum(ibanNumber)}</strong>
                     <span className="text-slate-500" dir="rtl">:الآيبان</span>
                   </div>
                 ) : (
-                  <p><span className="text-slate-500">{t('IBAN', 'الآيبان')}:</span> <strong className="font-mono">{ibanNumber}</strong></p>
+                  <p className="text-xs"><span className="text-slate-500">{t('IBAN', 'الآيبان')}:</span> <strong className="font-mono font-bold text-xs">{formatNum(ibanNumber)}</strong></p>
                 )
               )}
 
               {swiftCode && (
                 langMode === 'bilingual' ? (
-                  <div className="flex justify-between items-center gap-2">
+                  <div className="flex justify-between items-center gap-2 text-xs">
                     <span className="text-slate-500">SWIFT:</span>
-                    <strong className="font-mono text-slate-900 text-center">{swiftCode}</strong>
+                    <strong className="font-mono text-slate-900 text-center font-bold text-xs">{swiftCode}</strong>
                     <span className="text-slate-500" dir="rtl">:رمز السويفت</span>
                   </div>
                 ) : (
-                  <p><span className="text-slate-500">{t('SWIFT', 'رمز السويفت')}:</span> <strong className="font-mono">{swiftCode}</strong></p>
+                  <p className="text-xs"><span className="text-slate-500">{t('SWIFT', 'رمز السويفت')}:</span> <strong className="font-mono font-bold text-xs">{swiftCode}</strong></p>
                 )
               )}
             </div>
