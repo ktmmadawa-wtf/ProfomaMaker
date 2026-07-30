@@ -76,16 +76,42 @@ export default function InvoiceCreator() {
     setRows([t === 'room' ? EMPTY_ROOM_ROW() : t === 'event' ? EMPTY_EVENT_ROW() : EMPTY_MISC_ROW()]);
   };
 
+  const addDaysToDate = (dateStr, daysCount) => {
+    if (!dateStr || isNaN(daysCount)) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + daysCount);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const updateRow = (idx, field, value) => {
     setRows(prev => {
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: value };
 
-      // Auto-calc nights for room type
+      // Bidirectional auto-calc for room type:
+      // 1. Arrival + Departure => Nights
+      // 2. Arrival + Nights => Departure
       if (type === 'room') {
-        if (field === 'arrival' || field === 'departure') {
-          const a = field === 'arrival' ? value : next[idx].arrival;
-          const d = field === 'departure' ? value : next[idx].departure;
+        const a = next[idx].arrival;
+        const d = next[idx].departure;
+        const n = parseInt(next[idx].nights, 10);
+
+        if (field === 'nights') {
+          if (a && !isNaN(n) && n >= 0) {
+            next[idx].departure = addDaysToDate(a, n);
+          }
+        } else if (field === 'arrival') {
+          if (a && !isNaN(n) && n >= 0) {
+            next[idx].departure = addDaysToDate(a, n);
+          } else if (a && d) {
+            const diff = Math.ceil((new Date(d) - new Date(a)) / 86400000);
+            if (diff >= 0) next[idx].nights = String(diff);
+          }
+        } else if (field === 'departure') {
           if (a && d) {
             const diff = Math.ceil((new Date(d) - new Date(a)) / 86400000);
             if (diff >= 0) next[idx].nights = String(diff);
@@ -93,16 +119,29 @@ export default function InvoiceCreator() {
         }
       }
 
-      // Auto-calc Days for event & misc types
+      // Bidirectional auto-calc for event & misc types:
+      // 1. Start + End => Days
+      // 2. Start + Days => End
       if (type === 'event' || type === 'misc') {
-        if (field === 'start' || field === 'end') {
-          const s = field === 'start' ? value : next[idx].start;
-          const e = field === 'end' ? value : next[idx].end;
+        const s = next[idx].start;
+        const e = next[idx].end;
+        const dayCount = parseInt(next[idx].days, 10);
+
+        if (field === 'days') {
+          if (s && !isNaN(dayCount) && dayCount > 0) {
+            next[idx].end = addDaysToDate(s, dayCount - 1);
+          }
+        } else if (field === 'start') {
+          if (s && !isNaN(dayCount) && dayCount > 0) {
+            next[idx].end = addDaysToDate(s, dayCount - 1);
+          } else if (s && e) {
+            const diffDays = Math.ceil((new Date(e) - new Date(s)) / 86400000) + 1;
+            if (diffDays > 0) next[idx].days = String(diffDays);
+          }
+        } else if (field === 'end') {
           if (s && e) {
             const diffDays = Math.ceil((new Date(e) - new Date(s)) / 86400000) + 1;
-            if (diffDays > 0) {
-              next[idx].days = String(diffDays);
-            }
+            if (diffDays > 0) next[idx].days = String(diffDays);
           }
         }
       }

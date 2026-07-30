@@ -3,18 +3,24 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import InvoicePreviewModal from '../invoice/InvoicePreviewModal';
 
-function StatCard({ label, value, sub, color = 'blue' }) {
+function StatCard({ label, value, sub, color = 'blue', icon }) {
   const colors = {
-    blue:   'bg-blue-900/30 border-blue-700/40 text-blue-400',
-    green:  'bg-green-900/30 border-green-700/40 text-green-400',
-    yellow: 'bg-yellow-900/30 border-yellow-700/40 text-yellow-400',
-    slate:  'bg-slate-700/40 border-slate-600/40 text-slate-300'
+    blue:   'bg-[#132247] border-[#1d3570] text-[#4d82f3]',
+    indigo: 'bg-[#1a233b] border-[#29385c] text-[#7189bf]',
+    emerald:'bg-[#0d2a22] border-[#144738] text-[#34d399]',
+    purple: 'bg-[#27183e] border-[#43266b] text-[#c084fc]',
+    amber:  'bg-[#2c2014] border-[#4f381f] text-[#fbbf24]'
   };
   return (
-    <div className={`rounded-xl border p-5 ${colors[color]}`}>
-      <p className="text-xs font-medium uppercase tracking-wider opacity-70">{label}</p>
-      <p className="text-3xl font-bold text-white mt-1">{value ?? '—'}</p>
-      {sub && <p className="text-xs mt-1 opacity-60">{sub}</p>}
+    <div className={`rounded-2xl border p-5 transition-all hover:scale-[1.02] shadow-lg flex flex-col justify-between ${colors[color] || colors.blue}`}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] font-bold uppercase tracking-wider opacity-90 text-slate-300">{label}</p>
+        {icon && <div className="p-2 rounded-xl bg-white/10 text-current flex-shrink-0">{icon}</div>}
+      </div>
+      <div className="mt-3">
+        <p className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight font-sans">{value ?? '—'}</p>
+        {sub && <p className="text-xs mt-1.5 opacity-75 font-medium">{sub}</p>}
+      </div>
     </div>
   );
 }
@@ -37,9 +43,14 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, [api]);
 
-  const totalRevenue = invoices.reduce((s, i) => s + parseFloat(i.grand_total || 0), 0);
-  const outstanding  = invoices.reduce((s, i) => s + parseFloat(i.balance_due  || 0), 0);
-  const recent       = invoices.slice(0, 5);
+  const roomInvoices  = invoices.filter(i => i.invoice_type === 'room');
+  const eventInvoices = invoices.filter(i => i.invoice_type === 'event');
+  const miscInvoices  = invoices.filter(i => i.invoice_type === 'misc');
+
+  const roomTotal  = roomInvoices.reduce((s, i) => s + parseFloat(i.grand_total || 0), 0);
+  const eventTotal = eventInvoices.reduce((s, i) => s + parseFloat(i.grand_total || 0), 0);
+  const miscTotal  = miscInvoices.reduce((s, i) => s + parseFloat(i.grand_total || 0), 0);
+  const recent     = invoices.slice(0, 5);
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-6">
@@ -48,22 +59,82 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold text-white">
           Welcome back{user?.email ? `, ${user.email.split('@')[0]}` : ''}
         </h1>
-        <p className="text-slate-400 text-sm mt-0.5">Here's what's happening with your invoices.</p>
+        <p className="text-slate-400 text-sm mt-0.5">Overview of total invoices, active customers, and proformas by category.</p>
       </div>
 
-      {/* Stats */}
+      {/* Stats - 5 Stat Blocks with Line Icons */}
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="rounded-xl border border-slate-700 bg-slate-800 p-5 animate-pulse h-24" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="rounded-2xl border border-slate-700 bg-slate-800 p-5 animate-pulse h-32" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="Total Invoices"  value={invoices.length}           color="blue" />
-          <StatCard label="Customers"       value={customers.length}          color="slate" />
-          <StatCard label="Total Revenue"   value={`${totalRevenue.toFixed(0)} SAR`} color="green" />
-          <StatCard label="Outstanding"     value={`${outstanding.toFixed(0)} SAR`}  color="yellow" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Total Invoices */}
+          <StatCard
+            label="Total Invoices"
+            value={invoices.length}
+            sub="All Proformas"
+            color="blue"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            }
+          />
+
+          {/* Total Customers */}
+          <StatCard
+            label="Customers"
+            value={customers.length}
+            sub="Active Clients"
+            color="indigo"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            }
+          />
+
+          {/* Room Proformas */}
+          <StatCard
+            label="Room Stays"
+            value={`${roomTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} SAR`}
+            sub={`${roomInvoices.length} Proformas`}
+            color="emerald"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0h4m-4 0V11m0 0h4" />
+              </svg>
+            }
+          />
+
+          {/* Event Proformas */}
+          <StatCard
+            label="Event & Halls"
+            value={`${eventTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} SAR`}
+            sub={`${eventInvoices.length} Proformas`}
+            color="purple"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            }
+          />
+
+          {/* Misc Proformas */}
+          <StatCard
+            label="Miscellaneous"
+            value={`${miscTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} SAR`}
+            sub={`${miscInvoices.length} Proformas`}
+            color="amber"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5h2M7 9h10M7 13h10M7 17h6M3 3h18v18H3V3z" />
+              </svg>
+            }
+          />
         </div>
       )}
 

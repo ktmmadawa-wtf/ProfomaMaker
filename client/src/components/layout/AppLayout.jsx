@@ -1,6 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+
+function FlipCard({ value }) {
+  return (
+    <div className="relative inline-flex items-center justify-center px-1.5 py-0.5 bg-slate-800/90 border border-slate-700/80 rounded shadow-sm font-mono text-[11px] font-bold text-white tracking-wider select-none overflow-hidden min-w-[22px]">
+      <div className="absolute inset-x-0 top-0 h-[50%] bg-white/[0.06]" />
+      <div className="absolute inset-x-0 top-1/2 border-t border-slate-950/80 shadow-[0_1px_0_rgba(255,255,255,0.06)]" />
+      <span className="relative z-10 leading-none">{value}</span>
+    </div>
+  );
+}
+
+function LiveClock({ className = '' }) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weekday = dayNames[now.getDay()];
+  const day = String(now.getDate()).padStart(2, '0');
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = monthNames[now.getMonth()];
+  const year = now.getFullYear();
+
+  let hours = now.getHours();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const formattedHours = String(hours).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+
+  return (
+    <div className={`flex flex-nowrap items-center gap-1.5 whitespace-nowrap select-none ${className}`}>
+      {/* Date Flip Card */}
+      <div className="relative inline-flex items-center justify-center px-2 py-0.5 bg-slate-800/90 border border-slate-700/80 rounded shadow-sm font-mono text-[11px] font-medium text-slate-300 tracking-tight overflow-hidden flex-shrink-0">
+        <div className="absolute inset-x-0 top-0 h-[50%] bg-white/[0.06]" />
+        <div className="absolute inset-x-0 top-1/2 border-t border-slate-950/80 shadow-[0_1px_0_rgba(255,255,255,0.06)]" />
+        <span className="relative z-10 leading-none">{weekday} {day} {month} {year}</span>
+      </div>
+
+      <span className="text-slate-600 font-bold text-xs flex-shrink-0">•</span>
+
+      {/* Time Flip Cards */}
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        <FlipCard value={formattedHours} />
+        <span className="text-slate-500 font-bold text-[10px] animate-pulse mx-0.5">:</span>
+        <FlipCard value={minutes} />
+        <span className="ml-1 text-[10px] font-bold text-blue-400 uppercase tracking-wider">{ampm}</span>
+      </div>
+    </div>
+  );
+}
 
 const navItems = [
   {
@@ -88,16 +143,21 @@ export default function AppLayout() {
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b" style={{ borderColor: 'var(--sidebar-border)' }}>
-        <img
-          src="/icons/icon-192.png"
-          alt="Proforma by Madawa"
-          className="w-9 h-9 rounded-lg object-contain flex-shrink-0"
-        />
-        <div className="min-w-0">
-          <p className="font-bold text-sm leading-tight" style={{ color: 'var(--text-primary)' }}>PROFORMA</p>
-          <p className="text-xs leading-tight" style={{ color: 'var(--text-muted)' }}>by Madawa</p>
+      {/* Logo & Live Clock Header */}
+      <div className="px-4 py-3.5 border-b space-y-2" style={{ borderColor: 'var(--sidebar-border)' }}>
+        <div className="flex items-center gap-3">
+          <img
+            src="/icons/icon-192.png"
+            alt="Proforma by Madawa"
+            className="w-9 h-9 rounded-lg object-contain flex-shrink-0"
+          />
+          <div className="min-w-0">
+            <p className="font-bold text-sm leading-tight" style={{ color: 'var(--text-primary)' }}>PROFORMA</p>
+            <p className="text-xs leading-tight" style={{ color: 'var(--text-muted)' }}>by Madawa</p>
+          </div>
+        </div>
+        <div className="pt-1.5 border-t border-slate-700/40 flex items-center justify-between">
+          <LiveClock />
         </div>
       </div>
 
@@ -188,17 +248,20 @@ export default function AppLayout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--bg-base)' }}>
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 sidebar-themed">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <img src="/icons/icon-192.png" alt="Proforma by Madawa" className="w-5 h-5 object-contain" />
-          <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>PROFORMA</span>
+        <header className="md:hidden flex items-center justify-between gap-3 px-4 py-3 sidebar-themed">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <img src="/icons/icon-192.png" alt="Proforma by Madawa" className="w-5 h-5 object-contain" />
+            <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>PROFORMA</span>
+          </div>
+          <LiveClock />
         </header>
 
         {/* Page content */}
@@ -209,3 +272,4 @@ export default function AppLayout() {
     </div>
   );
 }
+
